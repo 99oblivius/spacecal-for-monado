@@ -1,0 +1,21 @@
+[package]
+name = "motoc-gui"
+version = "0.1.0"
+edition = "2024"
+description = "GTK4 GUI for motoc VR tracking origin calibration"
+repository = "https://github.com/99oblivius/motoc-gui"
+license = "MIT"
+keywords = ["vr", "monado", "openxr", "calibration"]
+categories = ["gui"]
+
+[dependencies]
+dirs = "6.0.0"
+gtk4 = { version = "0.10.3", features = ["v4_12"] }
+libadwaita = { version = "0.8.1", features = ["v1_4"] }
+regex = "1.12.2"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+
+[profile.release]
+lto = true
+strip = true
