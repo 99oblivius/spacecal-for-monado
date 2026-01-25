@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>dev.oblivius.motoc-gui</id>
+  <name>Motoc Calibration</name>
+  <summary>VR Tracking Origin Calibration Tool</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <description>
+    <p>
+      A GTK4 graphical interface for motoc, the Monado Tracking Origin Calibrator.
+      Calibrate SLAM-tracked and lighthouse-tracked coordinate spaces for VR setups.
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>Select source and target tracking devices from categorized dropdowns</li>
+      <li>5-second countdown before calibration for positioning</li>
+      <li>Floor level adjustment using hand tracking</li>
+      <li>Reset and recenter tracking origins</li>
+      <li>Remembers last selected devices</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">dev.oblivius.motoc-gui.desktop</launchable>
+  <url type="homepage">https://github.com/99oblivius/motoc-gui</url>
+  <url type="bugtracker">https://github.com/99oblivius/motoc-gui/issues</url>
+  <developer id="dev.oblivius">
+    <name>99oblivius</name>
+  </developer>
+  <content_rating type="oars-1.1" />
+  <releases>
+    <release version="0.1.0" date="2025-01-26">
+      <description>
+        <p>Initial release</p>
+      </description>
+    </release>
+  </releases>
+  <requires>
+    <id>io.github.galister.motoc</id>
+  </requires>
+  <recommends>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </recommends>
+</component>

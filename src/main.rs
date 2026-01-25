@@ -539,37 +539,9 @@ fn build_ui(app: &adw::Application) {
     window.present();
 }
 
-fn ensure_desktop_entry() {
-    let Some(data_dir) = dirs::data_dir() else { return };
-    let desktop_dir = data_dir.join("applications");
-    let desktop_file = desktop_dir.join("motoc-gui.desktop");
-
-    if desktop_file.exists() {
-        return;
-    }
-
-    let Ok(exe) = std::env::current_exe() else { return };
-    let content = format!(
-        "[Desktop Entry]\n\
-         Type=Application\n\
-         Name=Motoc Calibration\n\
-         Comment=VR Tracking Origin Calibration Tool\n\
-         Exec={}\n\
-         Icon=preferences-desktop-display\n\
-         Categories=Utility;\n\
-         Terminal=false\n",
-        exe.display()
-    );
-
-    let _ = std::fs::create_dir_all(&desktop_dir);
-    let _ = std::fs::write(&desktop_file, content);
-}
-
 fn main() {
-    ensure_desktop_entry();
-
     let app = adw::Application::builder()
-        .application_id("io.github.galister.motoc-gui")
+        .application_id("dev.oblivius.motoc-gui")
         .build();
 
     app.connect_activate(build_ui);
