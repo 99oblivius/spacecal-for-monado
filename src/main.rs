@@ -1,7 +1,21 @@
 use std::cell::{Cell, RefCell};
+use std::path::Path;
 use std::process::Command;
 use std::rc::Rc;
+use std::sync::LazyLock;
 use std::time::Duration;
+
+static IN_FLATPAK: LazyLock<bool> = LazyLock::new(|| Path::new("/.flatpak-info").exists());
+
+fn motoc_command() -> Command {
+    if *IN_FLATPAK {
+        let mut cmd = Command::new("flatpak-spawn");
+        cmd.args(["--host", "motoc"]);
+        cmd
+    } else {
+        Command::new("motoc")
+    }
+}
 
 use gtk4::glib::{timeout_add_local, ControlFlow};
 use gtk4::prelude::*;
@@ -72,7 +86,7 @@ fn parse_motoc_show(output: &str) -> Vec<Category> {
 }
 
 fn run_motoc_show() -> Vec<Category> {
-    match Command::new("motoc").arg("show").output() {
+    match motoc_command().arg("show").output() {
         Ok(output) => {
             let stdout = String::from_utf8_lossy(&output.stdout);
             parse_motoc_show(&stdout)
@@ -82,7 +96,7 @@ fn run_motoc_show() -> Vec<Category> {
 }
 
 fn run_motoc_command(args: &[&str]) -> Result<String, String> {
-    match Command::new("motoc").args(args).output() {
+    match motoc_command().args(args).output() {
         Ok(output) => {
             let stdout = String::from_utf8_lossy(&output.stdout);
             let stderr = String::from_utf8_lossy(&output.stderr);
@@ -297,12 +311,19 @@ fn build_ui(app: &adw::Application) {
     let window = adw::ApplicationWindow::builder()
         .application(app)
         .title("Motoc Calibration")
-        .default_width(420)
-        .default_height(340)
+        .default_width(480)
+        .default_height(420)
         .build();
 
+    let toolbar_view = adw::ToolbarView::new();
+    window.set_content(Some(&toolbar_view));
+
+    let header_bar = adw::HeaderBar::new();
+    header_bar.set_title_widget(Some(&Label::new(Some("Motoc Calibration"))));
+    toolbar_view.add_top_bar(&header_bar);
+
     let toast_overlay = adw::ToastOverlay::new();
-    window.set_content(Some(&toast_overlay));
+    toolbar_view.set_content(Some(&toast_overlay));
 
     let main_box = GtkBox::new(Orientation::Vertical, 16);
     main_box.set_margin_top(16);
@@ -310,10 +331,6 @@ fn build_ui(app: &adw::Application) {
     main_box.set_margin_start(16);
     main_box.set_margin_end(16);
     toast_overlay.set_child(Some(&main_box));
-
-    let header = Label::new(Some("Tracking Origin Calibration"));
-    header.add_css_class("title-2");
-    main_box.append(&header);
 
     let dropdowns_box = GtkBox::new(Orientation::Vertical, 12);
     main_box.append(&dropdowns_box);
