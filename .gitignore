@@ -1,1 +1,7 @@
 /target
+
+# makepkg artifacts
+*.tar.gz
+*.tar.zst
+*.pkg.tar.*
+/pkg/
