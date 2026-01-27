@@ -33,9 +33,6 @@
       </description>
     </release>
   </releases>
-  <requires>
-    <id>io.github.galister.motoc</id>
-  </requires>
   <recommends>
     <control>pointing</control>
     <control>keyboard</control>

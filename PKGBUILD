@@ -6,9 +6,8 @@ pkgdesc="VR Tracking Space Calibrator for Monado/WiVRn"
 arch=('x86_64' 'aarch64')
 url="https://github.com/99oblivius/monado-spacecal"
 license=('MIT')
-depends=('gtk4' 'libadwaita')
+depends=('gtk4' 'libadwaita' 'openxr' 'monado')
 makedepends=('cargo' 'git')
-optdepends=('motoc: CLI calibration backend (required until native integration)')
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
 sha256sums=('SKIP')
 

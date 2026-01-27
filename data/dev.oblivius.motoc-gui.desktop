@@ -1,9 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Motoc Calibration
-Comment=VR Tracking Origin Calibration Tool
-Exec=motoc-gui
-Icon=dev.oblivius.motoc-gui
-Categories=Utility;Settings;
-Keywords=vr;monado;openxr;calibration;tracking;
-Terminal=false
