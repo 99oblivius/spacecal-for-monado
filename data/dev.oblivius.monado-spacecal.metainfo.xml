@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>dev.oblivius.monado-spacecal</id>
+  <name>Monado SpaceCal</name>
+  <summary>VR Tracking Space Calibrator for Monado/WiVRn</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <description>
+    <p>
+      A GTK4 desktop application for calibrating VR tracking spaces on Linux.
+      Aligns SLAM-tracked (WiVRn/inside-out) and lighthouse-tracked (SteamVR base stations) coordinate spaces.
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>Select source and target tracking devices from categorized dropdowns</li>
+      <li>5-second countdown before calibration for positioning</li>
+      <li>Floor level adjustment using hand tracking</li>
+      <li>Reset and recenter tracking origins</li>
+      <li>Remembers last selected devices</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">dev.oblivius.monado-spacecal.desktop</launchable>
+  <url type="homepage">https://github.com/99oblivius/monado-spacecal</url>
+  <url type="bugtracker">https://github.com/99oblivius/monado-spacecal/issues</url>
+  <developer id="dev.oblivius">
+    <name>99oblivius</name>
+  </developer>
+  <content_rating type="oars-1.1" />
+  <releases>
+    <release version="0.1.0" date="2025-01-26">
+      <description>
+        <p>Initial release</p>
+      </description>
+    </release>
+  </releases>
+  <requires>
+    <id>io.github.galister.motoc</id>
+  </requires>
+  <recommends>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </recommends>
+</component>

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Monado SpaceCal
+Comment=VR Tracking Space Calibrator for Monado/WiVRn
+Exec=monado-spacecal
+Icon=dev.oblivius.monado-spacecal
+Categories=Utility;Settings;
+Keywords=vr;monado;wivrn;calibration;tracking;space;
+Terminal=false
