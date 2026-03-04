@@ -64,12 +64,21 @@ impl MonadoConnection {
             // This is crucial for devices like HTC Vive trackers where all have the same name
             let serial = device.serial().unwrap_or_default();
 
+            // Query battery status
+            let (battery_charge, battery_charging) = match device.battery_status() {
+                Ok(status) if status.present => (Some(status.charge), status.charging),
+                _ => (None, false),
+            };
+
             let dev = Device {
                 name: device.name.clone(),
                 serial,
                 description: String::new(),
                 category: categories[cat_idx].name.clone(),
                 category_index: categories[cat_idx].index,
+                device_index: device.index,
+                battery_charge,
+                battery_charging,
             };
             categories[cat_idx].devices.push(dev);
         }
@@ -331,6 +340,38 @@ impl MonadoConnection {
 
         self.monado.set_reference_space_offset(libmonado::ReferenceSpaceType::Stage, pose)
             .map_err(|e| MonadoError::ApplyOffsetFailed(format!("{:?}", e)))
+    }
+
+    /// Refresh battery status for all devices in the given categories
+    /// This is cheaper than full re-enumeration since it only queries battery
+    pub fn refresh_batteries(&self, categories: &mut [Category]) -> Result<(), MonadoError> {
+        let devices = self.monado.devices()
+            .map_err(|e| MonadoError::EnumerationFailed(format!("{:?}", e)))?;
+
+        // Build a lookup from device index to battery status
+        let mut battery_map = std::collections::HashMap::new();
+        for device in devices {
+            if let Ok(status) = device.battery_status() {
+                if status.present {
+                    battery_map.insert(device.index, (status.charge, status.charging));
+                }
+            }
+        }
+
+        // Update categories in place
+        for cat in categories.iter_mut() {
+            for dev in cat.devices.iter_mut() {
+                if let Some(&(charge, charging)) = battery_map.get(&dev.device_index) {
+                    dev.battery_charge = Some(charge);
+                    dev.battery_charging = charging;
+                } else {
+                    dev.battery_charge = None;
+                    dev.battery_charging = false;
+                }
+            }
+        }
+
+        Ok(())
     }
 
     /// Reset center (horizontal position and yaw) while preserving floor Y

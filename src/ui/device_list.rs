@@ -52,26 +52,25 @@ impl DeviceList {
     /// Create a new device selector with a label
     pub fn new(label_text: &str) -> Rc<Self> {
         let container = GtkBox::new(Orientation::Vertical, 8);
-        container.set_hexpand(true);
 
         // Header label
         let label = Label::new(Some(label_text));
-        label.set_xalign(0.0);
+        label.set_xalign(0.5);
         label.add_css_class("heading");
         container.append(&label);
 
         // Selection button
         let button = Button::new();
-        button.set_hexpand(true);
-        button.add_css_class("card");
+        button.add_css_class("outlined");
 
         let button_label = Label::new(Some("(None)"));
-        button_label.set_xalign(0.0);
+        button_label.set_xalign(0.5);
         button_label.set_margin_start(12);
         button_label.set_margin_end(12);
-        button_label.set_margin_top(12);
-        button_label.set_margin_bottom(12);
+        button_label.set_margin_top(8);
+        button_label.set_margin_bottom(8);
         button_label.set_ellipsize(gtk4::pango::EllipsizeMode::End);
+        button_label.set_max_width_chars(24);
         button.set_child(Some(&button_label));
 
         container.append(&button);

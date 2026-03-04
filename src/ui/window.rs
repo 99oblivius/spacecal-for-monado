@@ -92,24 +92,19 @@ pub fn build_ui(app: &adw::Application) {
     main_box.set_margin_end(24);
     toast_overlay.set_child(Some(&main_box));
 
-    // Top row: refresh + dropdowns
+    // Top row: dropdowns (centered, fixed width)
     let top_row = GtkBox::new(Orientation::Horizontal, 16);
-    top_row.set_valign(Align::Center);
+    top_row.set_halign(Align::Center);
+    top_row.set_hexpand(false);
     main_box.append(&top_row);
 
-    let refresh_btn = Button::from_icon_name("view-refresh-symbolic");
-    refresh_btn.set_tooltip_text(Some("Refresh Devices"));
-    refresh_btn.set_valign(Align::Start);
-    refresh_btn.set_margin_top(24);
-    top_row.append(&refresh_btn);
-
     let source_list = DeviceList::new("Source");
-    source_list.widget().set_hexpand(true);
+    source_list.widget().set_width_request(250);
     source_list.widget().set_tooltip_text(Some("Reference device with correct tracking"));
     top_row.append(source_list.widget());
 
     let target_list = DeviceList::new("Target");
-    target_list.widget().set_hexpand(true);
+    target_list.widget().set_width_request(250);
     target_list.widget().set_tooltip_text(Some("Device to calibrate (its origin is adjusted)"));
     top_row.append(target_list.widget());
 
@@ -117,6 +112,10 @@ pub fn build_ui(app: &adw::Application) {
     let button_box = GtkBox::new(Orientation::Horizontal, 12);
     button_box.set_halign(Align::Center);
     main_box.append(&button_box);
+
+    let refresh_btn = Button::from_icon_name("view-refresh-symbolic");
+    refresh_btn.set_tooltip_text(Some("Refresh Devices"));
+    button_box.append(&refresh_btn);
 
     let calibrate_btn = Button::with_label("Calibrate");
     calibrate_btn.add_css_class("suggested-action");
@@ -161,12 +160,19 @@ pub fn build_ui(app: &adw::Application) {
     status_label.set_margin_top(8);
     main_box.append(&status_label);
 
+    // Battery status bar
+    let battery_bar = GtkBox::new(Orientation::Horizontal, 16);
+    battery_bar.set_halign(Align::Center);
+    battery_bar.set_margin_top(4);
+    main_box.append(&battery_bar);
+
     // Function to sync UI with state
     fn update_ui_from_state(
         state: &SharedState,
         source_list: &Rc<DeviceList>,
         target_list: &Rc<DeviceList>,
         status_label: &Label,
+        battery_bar: &GtkBox,
     ) {
         let s = state.borrow();
 
@@ -188,6 +194,83 @@ pub fn build_ui(app: &adw::Application) {
         // Update target list with source-filtered devices
         let target_devices = s.target_devices();
         target_list.set_devices(target_devices, s.target_name());
+
+        // Update battery bar
+        update_battery_bar(battery_bar, &s);
+    }
+
+    /// Update the battery status bar with current device battery levels
+    fn update_battery_bar(bar: &GtkBox, state: &crate::ui::state::AppState) {
+        // Clear existing children
+        while let Some(child) = bar.first_child() {
+            bar.remove(&child);
+        }
+
+        let battery_list = state.battery_status_list();
+        if battery_list.is_empty() {
+            return;
+        }
+
+        for info in &battery_list {
+            let item = GtkBox::new(Orientation::Vertical, 2);
+            item.set_halign(Align::Center);
+
+            if !info.online {
+                let top = GtkBox::new(Orientation::Horizontal, 4);
+                top.set_halign(Align::Center);
+                let icon = gtk4::Image::from_icon_name("network-offline-symbolic");
+                icon.set_pixel_size(16);
+                icon.add_css_class("dim-label");
+                let label = Label::new(Some(&format!("{} Offline", info.short_name)));
+                label.add_css_class("caption");
+                label.add_css_class("dim-label");
+                top.append(&icon);
+                top.append(&label);
+                item.append(&top);
+            } else if let Some(charge) = info.charge {
+                let pct = (charge * 100.0).round() as u32;
+                let icon_name = if info.charging {
+                    if pct > 75 { "battery-full-charging-symbolic" }
+                    else if pct > 40 { "battery-good-charging-symbolic" }
+                    else if pct > 15 { "battery-low-charging-symbolic" }
+                    else { "battery-caution-charging-symbolic" }
+                } else if pct > 75 { "battery-full-symbolic" }
+                else if pct > 40 { "battery-good-symbolic" }
+                else if pct > 15 { "battery-low-symbolic" }
+                else { "battery-caution-symbolic" };
+
+                let top = GtkBox::new(Orientation::Horizontal, 4);
+                top.set_halign(Align::Center);
+                let icon = gtk4::Image::from_icon_name(icon_name);
+                icon.set_pixel_size(16);
+                let text = format!("{} {}%", info.short_name, pct);
+                let label = Label::new(Some(&text));
+                label.add_css_class("caption");
+                if pct <= 15 {
+                    label.add_css_class("error");
+                    icon.add_css_class("error");
+                } else if pct <= 40 {
+                    label.add_css_class("warning");
+                    icon.add_css_class("warning");
+                } else {
+                    label.add_css_class("dim-label");
+                    icon.add_css_class("dim-label");
+                }
+                top.append(&icon);
+                top.append(&label);
+                item.append(&top);
+            }
+
+            if !info.serial_suffix.is_empty() {
+                let serial_label = Label::new(Some(&info.serial_suffix));
+                serial_label.add_css_class("caption");
+                serial_label.add_css_class("dim-label");
+                serial_label.set_halign(Align::Center);
+                item.append(&serial_label);
+            }
+
+            bar.append(&item);
+        }
     }
 
     // Function to update only movement intensities (live, no rebuild)
@@ -203,7 +286,7 @@ pub fn build_ui(app: &adw::Application) {
     }
 
     // Initial UI sync
-    update_ui_from_state(&state, &source_list, &target_list, &status_label);
+    update_ui_from_state(&state, &source_list, &target_list, &status_label, &battery_bar);
 
     // Source selection changed
     let state_for_source = Rc::clone(&state);
@@ -243,27 +326,33 @@ pub fn build_ui(app: &adw::Application) {
     let source_list_for_refresh = Rc::clone(&source_list);
     let target_list_for_refresh = Rc::clone(&target_list);
     let status_for_refresh = status_label.clone();
+    let battery_bar_for_refresh = battery_bar.clone();
     refresh_btn.connect_clicked(move |_| {
-        state_for_refresh.borrow_mut().refresh_connection();
+        state_for_refresh.borrow_mut().force_refresh();
         update_ui_from_state(
             &state_for_refresh,
             &source_list_for_refresh,
             &target_list_for_refresh,
             &status_for_refresh,
+            &battery_bar_for_refresh,
         );
     });
 
-    // Automatic connection monitoring
+    // Automatic connection monitoring + battery polling
+    // - When disconnected: try to connect every 500ms (no IPC churn — just socket check)
+    // - When connected: refresh batteries every 5s using existing connection (no reconnect)
     let state_for_monitor = Rc::clone(&state);
     let source_list_for_monitor = Rc::clone(&source_list);
     let target_list_for_monitor = Rc::clone(&target_list);
     let status_for_monitor = status_label.clone();
+    let battery_bar_for_monitor = battery_bar.clone();
 
-    fn schedule_connection_check(
+    fn schedule_poll(
         state: SharedState,
         source_list: Rc<DeviceList>,
         target_list: Rc<DeviceList>,
         status_label: Label,
+        battery_bar: GtkBox,
     ) {
         let is_connected = state.borrow().is_connected();
         let interval_ms = if is_connected { 5000 } else { 500 };
@@ -271,22 +360,34 @@ pub fn build_ui(app: &adw::Application) {
         glib::timeout_add_local_once(
             std::time::Duration::from_millis(interval_ms),
             move || {
-                let changed = state.borrow_mut().refresh_connection();
+                if state.borrow().is_connected() {
+                    // Already connected — just refresh batteries (cheap, reuses connection)
+                    state.borrow_mut().refresh_batteries();
+                    update_battery_bar(&battery_bar, &state.borrow());
 
-                if changed {
-                    update_ui_from_state(&state, &source_list, &target_list, &status_label);
+                    // If connection was lost during battery refresh, update full UI
+                    if !state.borrow().is_connected() {
+                        update_ui_from_state(&state, &source_list, &target_list, &status_label, &battery_bar);
+                    }
+                } else {
+                    // Not connected — try to connect
+                    let changed = state.borrow_mut().refresh_connection();
+                    if changed {
+                        update_ui_from_state(&state, &source_list, &target_list, &status_label, &battery_bar);
+                    }
                 }
 
-                schedule_connection_check(state, source_list, target_list, status_label);
+                schedule_poll(state, source_list, target_list, status_label, battery_bar);
             },
         );
     }
 
-    schedule_connection_check(
+    schedule_poll(
         state_for_monitor,
         source_list_for_monitor,
         target_list_for_monitor,
         status_for_monitor,
+        battery_bar_for_monitor,
     );
 
     // Track open popovers - only run movement detection when at least one is open
