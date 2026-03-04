@@ -5,3 +5,12 @@
 *.tar.zst
 *.pkg.tar.*
 /pkg/
+
+# Claude / tool state
+.claude/
+.omc/
+
+# Duplicate source trees
+/src/monado-spacecal/
+/src/monado-spacecal-*/
+/monado-spacecal/

@@ -13,10 +13,12 @@
     <p>Features:</p>
     <ul>
       <li>Select source and target tracking devices from categorized dropdowns</li>
-      <li>5-second countdown before calibration for positioning</li>
-      <li>Floor level adjustment using hand tracking</li>
-      <li>Reset and recenter tracking origins</li>
-      <li>Remembers last selected devices</li>
+      <li>SVD/Kabsch sampled calibration with 3-second countdown</li>
+      <li>Floor calibration using target device Y position</li>
+      <li>Recenter forward direction and reset tracking origins</li>
+      <li>Battery status display for all tracked devices</li>
+      <li>Movement detection visualization</li>
+      <li>Persistent device selection across sessions</li>
     </ul>
   </description>
   <launchable type="desktop-id">dev.oblivius.monado-spacecal.desktop</launchable>

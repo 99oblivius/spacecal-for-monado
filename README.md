@@ -10,15 +10,20 @@
 
 ---
 
-GTK4 application that aligns SLAM-tracked (WiVRn/inside-out) and lighthouse-tracked (SteamVR base stations) coordinate spaces on Linux.
+GTK4/Libadwaita application that aligns SLAM-tracked (WiVRn/inside-out) and lighthouse-tracked (SteamVR base stations) coordinate spaces using the Monado OpenXR runtime on Linux.
 
 ## Features
 
-- Select source and target tracking devices
-- 5-second countdown for positioning
-- Floor level adjustment via hand tracking
-- Reset and recenter tracking origins
-- Persistent device selection
+- Source and target device selection with categorized dropdowns grouped by tracking origin
+- SVD/Kabsch sampled calibration with 3-second countdown
+- Floor calibration using target device Y position (place device on floor)
+- Recenter forward direction using HMD orientation
+- Reset tracking origins (per-origin or all) and reset floor level
+- Battery status display for all tracked devices
+- Movement detection visualization (highlights moving devices in the UI)
+- Persistent device selection across sessions
+- Automatic Monado reconnection
+- Dark theme by default
 
 ## Installation
 
