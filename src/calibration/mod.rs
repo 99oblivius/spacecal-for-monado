@@ -111,4 +111,9 @@ pub struct CalibrationResult {
     /// Tracking origin index to apply the offset to (target device's origin)
     pub target_origin_index: u32,
     pub sample_count: u32,
+    /// Median angular residual in degrees (lower = better fit)
+    pub median_error_degrees: f32,
+    /// Axis diversity from Kabsch SVD (0-1): how well the motion covered all three rotation axes.
+    /// Near 1.0 = excellent coverage, near 0.0 = motion was nearly coplanar.
+    pub axis_diversity: f32,
 }

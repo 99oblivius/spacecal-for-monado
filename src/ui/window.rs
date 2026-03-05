@@ -7,12 +7,12 @@ use std::sync::mpsc;
 use std::thread;
 
 use gtk4::prelude::*;
-use gtk4::{Align, Box as GtkBox, Button, Label, Orientation};
+use gtk4::{Align, Box as GtkBox, Button, CssProvider, Label, Orientation, Overlay};
 use gtk4::glib;
 use libadwaita as adw;
 use libadwaita::prelude::*;
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 
 use crate::calibration::{CalibrationCommand, CalibrationMessage};
 use crate::ui::device_list::DeviceList;
@@ -45,12 +45,191 @@ impl ToastManager {
         self.current_toast.borrow_mut().replace(toast.clone());
         self.overlay.add_toast(toast);
     }
+
+    /// Show a calibration result toast with color based on confidence and longer timeout.
+    /// `axis_diversity` is 0.0-1.0 from the Kabsch SVD (σ_min/σ_max).
+    fn show_calibration_result(&self, confidence: u32, axis_diversity: f32) {
+        if let Some(prev) = self.current_toast.borrow_mut().take() {
+            prev.dismiss();
+        }
+
+        let toast = adw::Toast::new("");
+        toast.set_timeout(0); // Stay until dismissed
+
+        let color = if confidence < 50 {
+            "#a51d2d" // dark red
+        } else if confidence < 75 {
+            "#e01b24" // red
+        } else if confidence < 80 {
+            "#e66100" // orange
+        } else if confidence < 90 {
+            "#c88800" // yellow
+        } else {
+            "#2ec27e" // green
+        };
+
+        let diversity_warning = if axis_diversity < 0.15 {
+            "\n<span color=\"#e01b24\">Motion too linear \u{2014} sweep a wide figure-eight next time</span>"
+        } else if axis_diversity < 0.333 {
+            "\n<span color=\"#e66100\">Limited axis coverage \u{2014} tilt into each curve of the figure-eight</span>"
+        } else {
+            ""
+        };
+
+        let label = Label::new(None);
+        label.set_markup(&format!(
+            "Calibration complete \u{2014} <span color=\"{}\"><b>{}%</b></span> confidence{}",
+            color, confidence, diversity_warning
+        ));
+        label.set_wrap(true);
+        toast.set_custom_title(Some(&label));
+
+        self.current_toast.borrow_mut().replace(toast.clone());
+        self.overlay.add_toast(toast);
+    }
+}
+
+/// Play a sound using canberra-gtk-play (fire-and-forget, silent if unavailable)
+fn play_sound(sound_id: &str) {
+    let _ = std::process::Command::new("canberra-gtk-play")
+        .arg("-i")
+        .arg(sound_id)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn();
+}
+
+/// Reset all calibration visual feedback to idle state
+fn restore_idle_visuals(
+    background_box: &GtkBox,
+    countdown_label: &Label,
+    progress_fill: &GtkBox,
+) {
+    background_box.remove_css_class("calibration-bg-active");
+    countdown_label.set_visible(false);
+    progress_fill.set_visible(false);
+    progress_fill.remove_css_class("progress-fill-active");
+    progress_fill.set_size_request(0, -1);
+}
+
+/// Update progress fill width based on fraction complete
+fn update_progress_fill(fill: &GtkBox, window: &adw::ApplicationWindow, fraction: f64) {
+    let fill_width = (window.width() as f64 * fraction) as i32;
+    fill.set_size_request(fill_width, -1);
+}
+
+/// SVG showing the optimal figure-eight motion pattern for calibration.
+/// The Kabsch algorithm needs diverse rotation axes — a figure-eight with tilting
+/// provides yaw + pitch from the sweeping motion and roll from leaning into curves.
+/// Edit the SVG at assets/calibration_motion.svg (viewable in any browser/Inkscape).
+const CALIBRATION_MOTION_SVG: &str = include_str!("../../assets/calibration_motion.svg");
+
+/// Build the calibration help dialog with motion diagram and "don't show again" toggle.
+/// When `calibrate_action` is true, shows Cancel/Calibrate buttons (pre-calibration flow).
+/// When false, shows a single "Got it" button (help/info flow).
+fn build_help_dialog(state: &SharedState, calibrate_action: bool) -> adw::AlertDialog {
+    let dialog = adw::AlertDialog::builder()
+        .heading("Calibration Instructions")
+        .build();
+
+    let extra_box = GtkBox::new(Orientation::Vertical, 16);
+
+    // Instructions label with Pango markup for bold key phrases
+    let instructions = Label::new(None);
+    instructions.set_markup(
+        "1. Grip both selected devices <b>firmly together</b> \u{2014} they must \
+         not shift relative to each other\n\n\
+         2. Wait for the countdown beeps to finish, then \
+         <b>slowly sweep a wide figure-eight</b> (\u{221E}) through the air, \
+         tilting into each curve as shown below\n\n\
+         3. <b>Keep moving</b> until the progress bar completes or you hear \
+         the chime",
+    );
+    instructions.set_xalign(0.0);
+    instructions.set_wrap(true);
+    instructions.set_max_width_chars(56);
+    extra_box.append(&instructions);
+
+    // SVG motion diagram
+    let svg_bytes = glib::Bytes::from_static(CALIBRATION_MOTION_SVG.as_bytes());
+    if let Ok(texture) = gtk4::gdk::Texture::from_bytes(&svg_bytes) {
+        let picture = gtk4::Picture::for_paintable(&texture);
+        picture.set_can_shrink(true);
+        picture.set_content_fit(gtk4::ContentFit::Contain);
+        picture.set_halign(Align::Center);
+        extra_box.append(&picture);
+    }
+
+    // Tip label — centered, smaller, dimmed
+    let tip = Label::new(Some(
+        "Tip: Open a device dropdown and move a device to see which one it is",
+    ));
+    tip.set_halign(Align::Center);
+    tip.add_css_class("dim-label");
+    tip.add_css_class("caption");
+    extra_box.append(&tip);
+
+    // "Don't show before calibrating" toggle
+    let pref_box = GtkBox::new(Orientation::Horizontal, 12);
+    pref_box.set_halign(Align::Center);
+    let pref_label = Label::new(Some("Don't show before calibrating"));
+    let pref_switch = gtk4::Switch::new();
+    pref_switch.set_active(state.borrow().hide_calibration_help());
+
+    let state_for_switch = Rc::clone(state);
+    pref_switch.connect_active_notify(move |switch| {
+        state_for_switch
+            .borrow_mut()
+            .set_hide_calibration_help(switch.is_active());
+    });
+
+    pref_box.append(&pref_label);
+    pref_box.append(&pref_switch);
+    extra_box.append(&pref_box);
+
+    dialog.set_extra_child(Some(&extra_box));
+
+    if calibrate_action {
+        dialog.add_response("cancel", "Cancel");
+        dialog.add_response("calibrate", "Calibrate");
+        dialog.set_response_appearance("calibrate", adw::ResponseAppearance::Suggested);
+        dialog.set_default_response(Some("calibrate"));
+        dialog.set_close_response("cancel");
+    } else {
+        dialog.add_response("got_it", "Got it");
+    }
+
+    dialog
 }
 
 pub fn build_ui(app: &adw::Application) {
     // Use AdwStyleManager for theme (avoids GtkSettings warning)
     let style_manager = adw::StyleManager::default();
     style_manager.set_color_scheme(adw::ColorScheme::PreferDark);
+
+    // Load calibration feedback CSS
+    let css_provider = CssProvider::new();
+    css_provider.load_from_string(
+        ".calibration-bg-active { \
+            background-color: rgba(53, 132, 228, 0.12); \
+            transition: background-color 500ms ease; \
+        } \
+        .progress-fill-active { \
+            background-color: rgba(53, 132, 228, 0.38); \
+        } \
+        .countdown-text { \
+            font-size: 420px; \
+            font-weight: 900; \
+            font-family: Impact, sans-serif; \
+            color: rgba(53, 132, 228, 0.35); \
+        }",
+    );
+    gtk4::style_context_add_provider_for_display(
+        &gtk4::gdk::Display::default().expect("Could not connect to a display"),
+        &css_provider,
+        gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
+    );
 
     // Create centralized state
     let state = create_shared_state();
@@ -70,16 +249,48 @@ pub fn build_ui(app: &adw::Application) {
     let window = adw::ApplicationWindow::builder()
         .application(app)
         .title("SpaceCal for Monado")
-        .default_width(720)
-        .default_height(180)
+        .default_width(940)
+        .default_height(630)
         .build();
 
+    window.set_size_request(940, 630);
+
     let toolbar_view = adw::ToolbarView::new();
-    window.set_content(Some(&toolbar_view));
+
+    // Overlay layers: background (child) → countdown label → toolbar (existing UI)
+    let overlay = Overlay::new();
+    window.set_content(Some(&overlay));
+
+    let background_box = GtkBox::new(Orientation::Vertical, 0);
+    background_box.set_hexpand(true);
+    background_box.set_vexpand(true);
+    overlay.set_child(Some(&background_box));
+
+    let progress_fill = GtkBox::new(Orientation::Vertical, 0);
+    progress_fill.set_halign(Align::Start);
+    progress_fill.set_vexpand(true);
+    progress_fill.set_visible(false);
+    background_box.append(&progress_fill);
+
+    let countdown_label = Label::new(None);
+    countdown_label.set_halign(Align::Center);
+    countdown_label.set_valign(Align::Center);
+    countdown_label.add_css_class("countdown-text");
+    countdown_label.set_visible(false);
+    overlay.add_overlay(&countdown_label);
+
+    overlay.add_overlay(&toolbar_view);
+    overlay.set_measure_overlay(&toolbar_view, true);
 
     let header_bar = adw::HeaderBar::new();
     header_bar.set_title_widget(Some(&Label::new(Some("SpaceCal for Monado"))));
+    header_bar.set_decoration_layout(Some(":close"));
     toolbar_view.add_top_bar(&header_bar);
+
+    // Help button in header bar
+    let help_btn = Button::from_icon_name("dialog-question-symbolic");
+    help_btn.set_tooltip_text(Some("Calibration Instructions"));
+    header_bar.pack_end(&help_btn);
 
     let toast_overlay = adw::ToastOverlay::new();
     toolbar_view.set_content(Some(&toast_overlay));
@@ -117,10 +328,68 @@ pub fn build_ui(app: &adw::Application) {
     refresh_btn.set_tooltip_text(Some("Refresh Devices"));
     button_box.append(&refresh_btn);
 
-    let calibrate_btn = Button::with_label("Calibrate");
+    let calibrate_btn = adw::SplitButton::new();
+    calibrate_btn.set_label("Calibrate");
     calibrate_btn.add_css_class("suggested-action");
     calibrate_btn.set_width_request(110);
-    calibrate_btn.set_tooltip_text(Some("Align target tracking to source (hold together)"));
+    calibrate_btn.set_tooltip_text(Some("Align target tracking to source (dropdown: sample count)"));
+
+    // Sample count dropdown (200, 400, 600)
+    let sample_count = Rc::new(Cell::new(state.borrow().sample_count()));
+    let sample_popover = gtk4::Popover::new();
+    let sample_list = gtk4::ListBox::new();
+    sample_list.set_selection_mode(gtk4::SelectionMode::None);
+    sample_list.add_css_class("boxed-list");
+    sample_list.set_margin_start(6);
+    sample_list.set_margin_end(6);
+    sample_list.set_margin_top(6);
+    sample_list.set_margin_bottom(6);
+
+    let sample_options: &[(u32, &str)] = &[(200, "Quick"), (400, "Balanced"), (600, "Precise")];
+    let check_labels: Rc<RefCell<Vec<Label>>> = Rc::new(RefCell::new(Vec::new()));
+    for &(count, name) in sample_options {
+        let row = gtk4::ListBoxRow::new();
+        let hbox = GtkBox::new(Orientation::Horizontal, 8);
+        hbox.set_margin_start(12);
+        hbox.set_margin_end(12);
+        hbox.set_margin_top(8);
+        hbox.set_margin_bottom(8);
+
+        let current = sample_count.get();
+        let check = Label::new(if count == current { Some("\u{2713}") } else { None });
+        check.set_width_request(16);
+        check_labels.borrow_mut().push(check.clone());
+
+        let label = Label::new(Some(name));
+        label.set_xalign(0.0);
+        label.set_hexpand(true);
+
+        hbox.append(&check);
+        hbox.append(&label);
+        row.set_child(Some(&hbox));
+        sample_list.append(&row);
+    }
+
+    let sample_count_for_list = Rc::clone(&sample_count);
+    let sample_popover_for_list = sample_popover.clone();
+    let check_labels_for_list = Rc::clone(&check_labels);
+    let state_for_sample = Rc::clone(&state);
+    sample_list.connect_row_activated(move |_, row| {
+        let counts = [200u32, 400, 600];
+        let index = row.index() as usize;
+        if let Some(&count) = counts.get(index) {
+            sample_count_for_list.set(count);
+            state_for_sample.borrow_mut().set_sample_count(count);
+            let labels = check_labels_for_list.borrow();
+            for (i, label) in labels.iter().enumerate() {
+                label.set_text(if i == index { "\u{2713}" } else { "" });
+            }
+        }
+        sample_popover_for_list.popdown();
+    });
+
+    sample_popover.set_child(Some(&sample_list));
+    calibrate_btn.set_popover(Some(&sample_popover));
     button_box.append(&calibrate_btn);
 
     let floor_btn = Button::with_label("Floor");
@@ -431,10 +700,12 @@ pub fn build_ui(app: &adw::Application) {
         }
     });
 
-    // Calibrate button
+    // Calibrate button — shows help dialog on first use
     let toasts_for_calibrate = toasts.clone();
     let state_for_calibrate = Rc::clone(&state);
     let cmd_tx_calibrate = Rc::clone(&cmd_tx);
+    let window_for_calibrate = window.clone();
+    let sample_count_for_calibrate = Rc::clone(&sample_count);
     calibrate_btn.connect_clicked(move |btn| {
         let s = state_for_calibrate.borrow();
         let src = s.selected_source();
@@ -450,20 +721,41 @@ pub fn build_ui(app: &adw::Application) {
 
         // Get stage offset from Monado (like motoc does) to transform poses to common frame
         let stage_offset = s.connection().and_then(|conn| conn.get_stage_offset().ok());
+        let hide_help = s.hide_calibration_help();
+        drop(s);
 
-        if let Err(e) = cmd_tx_calibrate.send(CalibrationCommand::StartSampled {
+        let cmd = CalibrationCommand::StartSampled {
             source_serial: src.unique_id().to_string(),
             target_serial: tgt.unique_id().to_string(),
             target_origin_index: tgt.category_index,
-            sample_count: 500,
+            sample_count: sample_count_for_calibrate.get(),
             stage_offset,
-        }) {
-            toasts_for_calibrate.show(&format!("Failed to start calibration: {}", e));
-            return;
-        }
+        };
 
-        btn.set_label("Calibrating...");
-        btn.set_sensitive(false);
+        if hide_help {
+            if let Err(e) = cmd_tx_calibrate.send(cmd) {
+                toasts_for_calibrate.show(&format!("Failed to start calibration: {}", e));
+                return;
+            }
+            btn.set_label("Calibrating...");
+            btn.set_sensitive(false);
+        } else {
+            let dialog = build_help_dialog(&state_for_calibrate, true);
+            let cmd_tx = Rc::clone(&cmd_tx_calibrate);
+            let btn = btn.clone();
+            let toasts = toasts_for_calibrate.clone();
+            dialog.connect_response(None, move |_, response| {
+                if response == "calibrate" {
+                    if let Err(e) = cmd_tx.send(cmd.clone()) {
+                        toasts.show(&format!("Failed to start calibration: {}", e));
+                        return;
+                    }
+                    btn.set_label("Calibrating...");
+                    btn.set_sensitive(false);
+                }
+            });
+            dialog.present(Some(&window_for_calibrate));
+        }
     });
 
     // Floor button - uses target device position to set floor level
@@ -643,6 +935,14 @@ pub fn build_ui(app: &adw::Application) {
         btn.set_sensitive(false);
     });
 
+    // Help button — always shows the dialog regardless of toggle (info-only mode)
+    let state_for_help = Rc::clone(&state);
+    let window_for_help = window.clone();
+    help_btn.connect_clicked(move |_| {
+        let dialog = build_help_dialog(&state_for_help, false);
+        dialog.present(Some(&window_for_help));
+    });
+
     // Message handler for calibration results and movement updates
     let calibrate_btn_for_msg = calibrate_btn.clone();
     let floor_btn_for_msg = floor_btn.clone();
@@ -651,25 +951,58 @@ pub fn build_ui(app: &adw::Application) {
     let state_for_msg = Rc::clone(&state);
     let source_list_for_msg = Rc::clone(&source_list);
     let target_list_for_msg = Rc::clone(&target_list);
+    let background_box_for_msg = background_box.clone();
+    let countdown_label_for_msg = countdown_label.clone();
+    let progress_fill_for_msg = progress_fill.clone();
+    let window_for_msg = window.clone();
 
     glib::source::idle_add_local(move || {
         while let Ok(msg) = msg_rx.try_recv() {
             match msg {
                 CalibrationMessage::Countdown { seconds } => {
+                    // Dismiss previous result toast when new calibration starts
+                    if let Some(prev) = toasts_for_msg.current_toast.borrow_mut().take() {
+                        prev.dismiss();
+                    }
                     calibrate_btn_for_msg.set_label(&format!("{}...", seconds));
+                    background_box_for_msg.add_css_class("calibration-bg-active");
+                    countdown_label_for_msg.set_text(&format!("{}", seconds));
+                    countdown_label_for_msg.set_visible(true);
+                    play_sound("message");
                 }
                 CalibrationMessage::RecenterCountdown { seconds } => {
                     recenter_btn_for_msg.set_label(&format!("{}...", seconds));
+                    background_box_for_msg.add_css_class("calibration-bg-active");
+                    countdown_label_for_msg.set_text(&format!("{}", seconds));
+                    countdown_label_for_msg.set_visible(true);
+                    play_sound("message");
                 }
                 CalibrationMessage::Progress { collected, total } => {
                     calibrate_btn_for_msg.set_label(&format!("{}/{}...", collected, total));
+                    countdown_label_for_msg.set_visible(false);
+                    progress_fill_for_msg.set_visible(true);
+                    progress_fill_for_msg.add_css_class("progress-fill-active");
+                    let fraction = collected as f64 / total as f64;
+                    update_progress_fill(&progress_fill_for_msg, &window_for_msg, fraction);
                 }
                 CalibrationMessage::FloorProgress { collected, total } => {
                     floor_btn_for_msg.set_label(&format!("{}/{}...", collected, total));
+                    background_box_for_msg.add_css_class("calibration-bg-active");
+                    countdown_label_for_msg.set_visible(false);
+                    progress_fill_for_msg.set_visible(true);
+                    progress_fill_for_msg.add_css_class("progress-fill-active");
+                    let fraction = collected as f64 / total as f64;
+                    update_progress_fill(&progress_fill_for_msg, &window_for_msg, fraction);
                 }
                 CalibrationMessage::SampledComplete(result) => {
                     calibrate_btn_for_msg.set_label("Calibrate");
                     calibrate_btn_for_msg.set_sensitive(true);
+                    restore_idle_visuals(
+                        &background_box_for_msg,
+                        &countdown_label_for_msg,
+                        &progress_fill_for_msg,
+                    );
+                    play_sound("complete");
 
                     // Apply the calibration offset to the TARGET tracking origin
                     let s = state_for_msg.borrow();
@@ -677,10 +1010,13 @@ pub fn build_ui(app: &adw::Application) {
                         let position = result.transform.position_f64();
                         let orientation = result.transform.orientation_f64();
                         match conn.apply_offset(result.target_origin_index, position, orientation) {
-                            Ok(_) => toasts_for_msg.show(&format!(
-                                "Calibration applied ({} samples)",
-                                result.sample_count
-                            )),
+                            Ok(_) => {
+                                // Exponential quality curve: realistic drift is 1-15°,
+                                // so 100 × exp(-0.028 × d^1.6) gives a natural gradient
+                                let d = result.median_error_degrees as f64;
+                                let confidence = (100.0 * (-0.028 * d.powf(1.6)).exp()) as u32;
+                                toasts_for_msg.show_calibration_result(confidence, result.axis_diversity);
+                            }
                             Err(e) => toasts_for_msg.show(&format!("Failed to apply calibration: {}", e)),
                         }
                     } else {
@@ -690,6 +1026,12 @@ pub fn build_ui(app: &adw::Application) {
                 CalibrationMessage::FloorComplete { height_adjustment } => {
                     floor_btn_for_msg.set_label("Floor");
                     floor_btn_for_msg.set_sensitive(true);
+                    restore_idle_visuals(
+                        &background_box_for_msg,
+                        &countdown_label_for_msg,
+                        &progress_fill_for_msg,
+                    );
+                    play_sound("complete");
 
                     // Floor calibration:
                     // height_adjustment = -(measured_floor_in_stage), so measured = -height_adjustment
@@ -721,6 +1063,12 @@ pub fn build_ui(app: &adw::Application) {
                 CalibrationMessage::RecenterComplete { position, orientation } => {
                     recenter_btn_for_msg.set_label("Recenter");
                     recenter_btn_for_msg.set_sensitive(true);
+                    restore_idle_visuals(
+                        &background_box_for_msg,
+                        &countdown_label_for_msg,
+                        &progress_fill_for_msg,
+                    );
+                    play_sound("complete");
 
                     // Apply recenter using STAGE reference space (motoc approach)
                     let s = state_for_msg.borrow();
@@ -800,6 +1148,11 @@ pub fn build_ui(app: &adw::Application) {
                     floor_btn_for_msg.set_sensitive(true);
                     recenter_btn_for_msg.set_label("Recenter");
                     recenter_btn_for_msg.set_sensitive(true);
+                    restore_idle_visuals(
+                        &background_box_for_msg,
+                        &countdown_label_for_msg,
+                        &progress_fill_for_msg,
+                    );
                     toasts_for_msg.show(&format!("Error: {}", e));
                 }
                 _ => {}

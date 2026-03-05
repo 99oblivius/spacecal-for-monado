@@ -8,6 +8,7 @@ url="https://github.com/99oblivius/spacecal-for-monado"
 license=('MIT')
 depends=('gtk4' 'libadwaita' 'openxr' 'monado')
 makedepends=('cargo' 'git')
+optdepends=('libcanberra: audio feedback during calibration')
 provides=('spacecal-for-monado')
 conflicts=('spacecal-for-monado')
 source=("git+$url.git")

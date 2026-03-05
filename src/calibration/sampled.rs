@@ -9,7 +9,7 @@
 //! of their movements, we can find the rotation that aligns the coordinate systems.
 
 use nalgebra::{Dyn, Matrix3, OMatrix, Rotation3, RowVector3, Vector3, U1, U3};
-use crate::calibration::transform::TransformD;
+use crate::calibration::transform::{TransformD, average_quaternions};
 use crate::error::CalibrationError;
 
 /// A single pose sample from both source and target devices
@@ -256,8 +256,10 @@ impl SampleCollector {
     /// 2. Use Kabsch algorithm on rotation axes to find the rotation alignment
     /// 3. Solve a linear system for the translation
     ///
-    /// Returns offset O where O × Target = Source
-    pub fn compute_calibration(&self) -> Result<TransformD, CalibrationError> {
+    /// Returns (offset O, median_error_degrees, axis_diversity) where O × Target = Source.
+    /// The median error measures grip consistency; axis_diversity (0-1) measures
+    /// how well the motion covered all three rotation axes.
+    pub fn compute_calibration(&self) -> Result<(TransformD, f32, f32), CalibrationError> {
         if self.samples.len() < 3 {
             return Err(CalibrationError::InsufficientSamples {
                 required: 3,
@@ -269,15 +271,38 @@ impl SampleCollector {
         let samples: Vec<Sample> = self.samples.iter().map(Sample::from_pose_sample).collect();
 
         // Step 1: Compute rotation using Kabsch on rotation axes
-        let rotation = calibrate_rotation(&samples)?;
+        let (rotation, axis_diversity) = calibrate_rotation(&samples)?;
 
         // Step 2: Compute translation using linear system
         let translation = calibrate_translation(&samples, &rotation)?;
 
-        Ok(TransformD {
-            basis: rotation,
-            origin: translation,
-        })
+        // Step 3: Measure grip consistency — how much the device-to-device
+        // offset drifts across samples.  source⁻¹ × R × target should be
+        // constant if the devices are held perfectly rigid.
+        let calibration_quat = nalgebra::UnitQuaternion::from_rotation_matrix(&rotation);
+        let deltas: Vec<nalgebra::UnitQuaternion<f64>> = self
+            .samples
+            .iter()
+            .map(|s| s.source_orientation.inverse() * calibration_quat * s.target_orientation)
+            .collect();
+        // Use quaternion average as reference (stable) instead of first sample (noisy)
+        let reference = average_quaternions(&deltas)
+            .unwrap_or(deltas[0]);
+        let mut drift: Vec<f64> = deltas
+            .iter()
+            .map(|d| reference.rotation_to(d).angle().to_degrees())
+            .collect();
+        drift.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        let median_error = drift[drift.len() / 2] as f32;
+
+        Ok((
+            TransformD {
+                basis: rotation,
+                origin: translation,
+            },
+            median_error,
+            axis_diversity as f32,
+        ))
     }
 }
 
@@ -289,7 +314,10 @@ impl SampleCollector {
 ///
 /// We extract the rotation axes from these delta rotations and use Kabsch
 /// to find the rotation R that best aligns the source axes to target axes.
-fn calibrate_rotation(samples: &[Sample]) -> Result<Rotation3<f64>, CalibrationError> {
+/// Returns (rotation, axis_diversity) where axis_diversity = σ_min / σ_max from the SVD.
+/// A value near 1.0 means rotation axes spanned all three dimensions well;
+/// near 0.0 means motion was nearly coplanar (one axis missing).
+fn calibrate_rotation(samples: &[Sample]) -> Result<(Rotation3<f64>, f64), CalibrationError> {
     // Collect delta rotation samples from all pairs
     let mut deltas = Vec::with_capacity(samples.len() * samples.len() / 2);
 
@@ -338,6 +366,14 @@ fn calibrate_rotation(samples: &[Sample]) -> Result<Rotation3<f64>, CalibrationE
     let u = svd.u.ok_or(CalibrationError::SvdFailed)?;
     let v = svd.v_t.ok_or(CalibrationError::SvdFailed)?.transpose();
 
+    // Axis diversity: ratio of smallest to largest singular value.
+    // σ_min / σ_max ≈ 1.0 means all three rotation axes were well-represented;
+    // ≈ 0.0 means motion was nearly coplanar (e.g. only waving back and forth).
+    let svals = &svd.singular_values;
+    let sigma_max = svals[0].max(1e-12);
+    let sigma_min = svals[svals.len() - 1];
+    let axis_diversity = (sigma_min / sigma_max).clamp(0.0, 1.0);
+
     // Compute rotation with determinant correction to ensure proper rotation (not reflection)
     let mut i_mat = Matrix3::identity();
     if (u * v.transpose()).determinant() < 0.0 {
@@ -347,7 +383,7 @@ fn calibrate_rotation(samples: &[Sample]) -> Result<Rotation3<f64>, CalibrationE
     let rot = v * i_mat * u.transpose();
     let rot = rot.transpose();
 
-    Ok(Rotation3::from_matrix_unchecked(rot))
+    Ok((Rotation3::from_matrix_unchecked(rot), axis_diversity))
 }
 
 /// Compute translation using a least-squares linear system
@@ -436,7 +472,7 @@ mod tests {
             });
         }
 
-        let result = collector.compute_calibration().unwrap();
+        let (result, _median_error, _axis_diversity) = collector.compute_calibration().unwrap();
         // Should be near identity
         assert!(result.origin.norm() < 0.1, "Translation too large: {:?}", result.origin);
     }
@@ -473,7 +509,7 @@ mod tests {
             });
         }
 
-        let result = collector.compute_calibration().unwrap();
+        let (result, _median_error, _axis_diversity) = collector.compute_calibration().unwrap();
 
         // Check that the computed rotation matches the offset
         let result_quat = nalgebra::UnitQuaternion::from_rotation_matrix(&result.basis);
@@ -523,7 +559,7 @@ mod tests {
             });
         }
 
-        let result = collector.compute_calibration().unwrap();
+        let (result, _median_error, _axis_diversity) = collector.compute_calibration().unwrap();
 
         // Check rotation
         let result_quat = nalgebra::UnitQuaternion::from_rotation_matrix(&result.basis);

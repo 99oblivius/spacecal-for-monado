@@ -641,7 +641,7 @@ pub fn xr_event_loop<S: MessageSender>(
                     // Compute calibration if we have enough samples
                     if collector.is_complete() {
                         match collector.compute_calibration() {
-                            Ok(offset) => {
+                            Ok((offset, median_error_degrees, axis_diversity)) => {
                                 // The calibration computes: O = S × T⁻¹ (averaged over samples)
                                 // where S = source pose, T = target pose
                                 // This offset satisfies: O × T = S
@@ -653,14 +653,21 @@ pub fn xr_event_loop<S: MessageSender>(
                                     target_name: target_dev.name().to_string(),
                                     target_origin_index,
                                     sample_count: collector.sample_count(),
+                                    median_error_degrees,
+                                    axis_diversity,
                                 };
 
                                 let _ = msg_tx.send(CalibrationMessage::SampledComplete(result));
                             }
                             Err(e) => {
-                                let _ = msg_tx.send(CalibrationMessage::Error(
-                                    format!("Failed to compute calibration: {:?}", e)
-                                ));
+                                let user_msg = match &e {
+                                    crate::error::CalibrationError::InsufficientSamples { .. } =>
+                                        "Not enough movement \u{2014} grip both devices firmly and sweep a wide figure-eight".to_string(),
+                                    crate::error::CalibrationError::SvdFailed =>
+                                        "Calibration math failed \u{2014} try again with more varied motion".to_string(),
+                                    other => format!("Calibration failed: {:?}", other),
+                                };
+                                let _ = msg_tx.send(CalibrationMessage::Error(user_msg));
                             }
                         }
                     } else {

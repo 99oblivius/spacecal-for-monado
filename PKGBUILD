@@ -8,6 +8,7 @@ url="https://github.com/99oblivius/spacecal-for-monado"
 license=('MIT')
 depends=('gtk4' 'libadwaita' 'openxr' 'monado')
 makedepends=('cargo' 'git')
+optdepends=('libcanberra: audio feedback during calibration')
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
 sha256sums=('SKIP')
 

@@ -5,25 +5,21 @@
 <h1 align="center">SpaceCal for Monado</h1>
 
 <p align="center">
-  VR Tracking Space Calibrator for Monado/WiVRn
+  Align mixed VR tracking spaces on Linux
 </p>
 
 ---
 
-GTK4/Libadwaita application that aligns SLAM-tracked (WiVRn/inside-out) and lighthouse-tracked (SteamVR base stations) coordinate spaces using the Monado OpenXR runtime on Linux.
+<p align="center">
+  <img src="docs/screenshot.png" alt="SpaceCal for Monado" width="600">
+</p>
 
-## Features
+SpaceCal aligns VR devices that use different tracking systems — like a WiVRn headset with lighthouse-tracked controllers — into a single unified space through the Monado OpenXR runtime. Pick your devices, calibrate, and play.
 
-- Source and target device selection with categorized dropdowns grouped by tracking origin
-- SVD/Kabsch sampled calibration with 3-second countdown
-- Floor calibration using target device Y position (place device on floor)
-- Recenter forward direction using HMD orientation
-- Reset tracking origins (per-origin or all) and reset floor level
-- Battery status display for all tracked devices
-- Movement detection visualization (highlights moving devices in the UI)
-- Persistent device selection across sessions
-- Automatic Monado reconnection
-- Dark theme by default
+- **Sampled calibration** — countdown with audio cues, full-window progress bar, and confidence scoring that reports both grip consistency and axis diversity
+- **Floor and recenter** — set floor height by placing a device on the ground, recenter forward direction from your HMD
+- **Live device identification** — not sure which tracker is which? Move it and watch it light up in the device list
+- **Battery status** — monitor charge levels for all your tracked devices at a glance
 
 ## Installation
 
@@ -49,7 +45,3 @@ sudo make PREFIX=/usr install
 ## License
 
 MIT
-
-## Disclaimer
-
-Monado is a trademark of its respective owners. SpaceCal for Monado is an independent open-source project and is not affiliated with or endorsed by the Monado project.

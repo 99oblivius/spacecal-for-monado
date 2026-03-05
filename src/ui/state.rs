@@ -99,6 +99,12 @@ pub struct AppState {
     /// Used to show offline status when devices disconnect
     known_battery_devices: HashMap<String, BatteryInfo>,
 
+    /// Whether to skip showing the calibration help dialog
+    hide_calibration_help: bool,
+
+    /// Number of samples for calibration (200/400/600)
+    sample_count: u32,
+
     /// Listeners to notify on state change
     listeners: Vec<StateListener>,
 }
@@ -121,6 +127,8 @@ impl AppState {
             target_id: if config.target.is_empty() { None } else { Some(config.target) },
             movement_intensities: HashMap::new(),
             known_battery_devices: HashMap::new(),
+            hide_calibration_help: config.hide_calibration_help,
+            sample_count: config.sample_count,
             listeners: Vec::new(),
         };
         state.update_known_battery_devices();
@@ -343,11 +351,39 @@ impl AppState {
         &self.movement_intensities
     }
 
+    /// Whether to hide the calibration help dialog before calibrating
+    pub fn hide_calibration_help(&self) -> bool {
+        self.hide_calibration_help
+    }
+
+    /// Set whether to hide the calibration help dialog
+    pub fn set_hide_calibration_help(&mut self, hide: bool) {
+        if self.hide_calibration_help != hide {
+            self.hide_calibration_help = hide;
+            self.save_config();
+        }
+    }
+
+    /// Get the configured sample count
+    pub fn sample_count(&self) -> u32 {
+        self.sample_count
+    }
+
+    /// Set the sample count and persist
+    pub fn set_sample_count(&mut self, count: u32) {
+        if self.sample_count != count {
+            self.sample_count = count;
+            self.save_config();
+        }
+    }
+
     /// Save current selection to config file
     fn save_config(&self) {
         let config = Config {
             source: self.source_id.clone().unwrap_or_default(),
             target: self.target_id.clone().unwrap_or_default(),
+            hide_calibration_help: self.hide_calibration_help,
+            sample_count: self.sample_count,
         };
         if let Err(e) = config.save() {
             eprintln!("Warning: Failed to save config: {}", e);

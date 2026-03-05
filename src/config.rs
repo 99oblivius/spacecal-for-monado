@@ -5,6 +5,14 @@ use crate::error::ConfigError;
 pub struct Config {
     pub source: String,
     pub target: String,
+    #[serde(default)]
+    pub hide_calibration_help: bool,
+    #[serde(default = "default_sample_count")]
+    pub sample_count: u32,
+}
+
+fn default_sample_count() -> u32 {
+    400
 }
 
 impl Config {
