@@ -11,6 +11,6 @@
 .omc/
 
 # Duplicate source trees
-/src/monado-spacecal/
-/src/monado-spacecal-*/
-/monado-spacecal/
+/src/spacecal-for-monado/
+/src/spacecal-for-monado-*/
+/spacecal-for-monado/

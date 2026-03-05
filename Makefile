@@ -5,8 +5,8 @@ APPLICATIONSDIR = $(DATADIR)/applications
 ICONSDIR = $(DATADIR)/icons/hicolor/scalable/apps
 METAINFODIR = $(DATADIR)/metainfo
 
-APP_ID = dev.oblivius.monado-spacecal
-BIN_NAME = monado-spacecal
+APP_ID = dev.oblivius.spacecal-for-monado
+BIN_NAME = spacecal-for-monado
 
 .PHONY: all build install install-user uninstall uninstall-user clean
 

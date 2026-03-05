@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>dev.oblivius.monado-spacecal</id>
-  <name>Monado SpaceCal</name>
+  <id>dev.oblivius.spacecal-for-monado</id>
+  <name>SpaceCal for Monado</name>
   <summary>VR Tracking Space Calibrator for Monado/WiVRn</summary>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
@@ -21,9 +21,9 @@
       <li>Persistent device selection across sessions</li>
     </ul>
   </description>
-  <launchable type="desktop-id">dev.oblivius.monado-spacecal.desktop</launchable>
-  <url type="homepage">https://github.com/99oblivius/monado-spacecal</url>
-  <url type="bugtracker">https://github.com/99oblivius/monado-spacecal/issues</url>
+  <launchable type="desktop-id">dev.oblivius.spacecal-for-monado.desktop</launchable>
+  <url type="homepage">https://github.com/99oblivius/spacecal-for-monado</url>
+  <url type="bugtracker">https://github.com/99oblivius/spacecal-for-monado/issues</url>
   <developer id="dev.oblivius">
     <name>99oblivius</name>
   </developer>

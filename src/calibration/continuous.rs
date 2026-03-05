@@ -19,8 +19,8 @@
 //! # Example
 //!
 //! ```no_run
-//! use monado_spacecal::calibration::continuous::{ContinuousCalibrator, ContinuousConfig};
-//! use monado_spacecal::calibration::transform::TransformD;
+//! use spacecal_for_monado::calibration::continuous::{ContinuousCalibrator, ContinuousConfig};
+//! use spacecal_for_monado::calibration::transform::TransformD;
 //!
 //! let mut calibrator = ContinuousCalibrator::with_default_config();
 //! calibrator.start();
@@ -177,8 +177,8 @@ impl ContinuousCalibrator {
     /// # Example
     ///
     /// ```no_run
-    /// # use monado_spacecal::calibration::continuous::ContinuousCalibrator;
-    /// # use monado_spacecal::calibration::transform::TransformD;
+    /// # use spacecal_for_monado::calibration::continuous::ContinuousCalibrator;
+    /// # use spacecal_for_monado::calibration::transform::TransformD;
     /// # let mut calibrator = ContinuousCalibrator::with_default_config();
     /// calibrator.start();
     ///

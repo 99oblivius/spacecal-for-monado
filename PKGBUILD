@@ -1,10 +1,10 @@
 # Maintainer: 99oblivius <99oblivius at proton dot me>
-pkgname=monado-spacecal
+pkgname=spacecal-for-monado
 pkgver=0.1.0
 pkgrel=1
 pkgdesc="VR Tracking Space Calibrator for Monado/WiVRn"
 arch=('x86_64' 'aarch64')
-url="https://github.com/99oblivius/monado-spacecal"
+url="https://github.com/99oblivius/spacecal-for-monado"
 license=('MIT')
 depends=('gtk4' 'libadwaita' 'openxr' 'monado')
 makedepends=('cargo' 'git')

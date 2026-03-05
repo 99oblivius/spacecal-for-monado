@@ -69,7 +69,7 @@ pub fn build_ui(app: &adw::Application) {
     // Build the window
     let window = adw::ApplicationWindow::builder()
         .application(app)
-        .title("Monado SpaceCal")
+        .title("SpaceCal for Monado")
         .default_width(720)
         .default_height(180)
         .build();
@@ -78,7 +78,7 @@ pub fn build_ui(app: &adw::Application) {
     window.set_content(Some(&toolbar_view));
 
     let header_bar = adw::HeaderBar::new();
-    header_bar.set_title_widget(Some(&Label::new(Some("Monado SpaceCal"))));
+    header_bar.set_title_widget(Some(&Label::new(Some("SpaceCal for Monado"))));
     toolbar_view.add_top_bar(&header_bar);
 
     let toast_overlay = adw::ToastOverlay::new();

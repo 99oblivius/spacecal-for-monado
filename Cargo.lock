@@ -961,26 +961,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e53debba6bda7a793e5f99b8dacf19e626084f525f7829104ba9898f367d85ff"
 
 [[package]]
-name = "monado-spacecal"
-version = "0.1.0"
-dependencies = [
- "async-channel",
- "chrono",
- "dirs",
- "gtk4",
- "libadwaita",
- "libmonado",
- "mint",
- "nalgebra",
- "openxr",
- "regex",
- "serde",
- "serde_json",
- "thiserror",
- "toml 0.8.23",
-]
-
-[[package]]
 name = "nalgebra"
 version = "0.34.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1397,6 +1377,26 @@ name = "smallvec"
 version = "1.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
+
+[[package]]
+name = "spacecal-for-monado"
+version = "0.1.0"
+dependencies = [
+ "async-channel",
+ "chrono",
+ "dirs",
+ "gtk4",
+ "libadwaita",
+ "libmonado",
+ "mint",
+ "nalgebra",
+ "openxr",
+ "regex",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "toml 0.8.23",
+]
 
 [[package]]
 name = "syn"

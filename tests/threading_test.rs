@@ -1,4 +1,4 @@
-use monado_spacecal::calibration::{CalibrationCommand, CalibrationMessage};
+use spacecal_for_monado::calibration::{CalibrationCommand, CalibrationMessage};
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
@@ -11,7 +11,7 @@ fn test_xr_event_loop_shutdown() {
 
     // Start the XR event loop in a background thread
     let handle = thread::spawn(move || {
-        monado_spacecal::xr::xr_event_loop(cmd_rx, msg_tx);
+        spacecal_for_monado::xr::xr_event_loop(cmd_rx, msg_tx);
     });
 
     // Give it a moment to start
@@ -36,7 +36,7 @@ fn test_xr_event_loop_commands_without_openxr() {
 
     // Start the XR event loop in a background thread
     let handle = thread::spawn(move || {
-        monado_spacecal::xr::xr_event_loop(cmd_rx, msg_tx);
+        spacecal_for_monado::xr::xr_event_loop(cmd_rx, msg_tx);
     });
 
     // Give it a moment to start
@@ -93,7 +93,7 @@ fn test_xr_event_loop_floor_calibration() {
 
     // Start the XR event loop in a background thread
     let handle = thread::spawn(move || {
-        monado_spacecal::xr::xr_event_loop(cmd_rx, msg_tx);
+        spacecal_for_monado::xr::xr_event_loop(cmd_rx, msg_tx);
     });
 
     // Give it a moment to start
@@ -148,7 +148,7 @@ fn test_xr_event_loop_channel_closed() {
 
     // Start the XR event loop in a background thread
     let handle = thread::spawn(move || {
-        monado_spacecal::xr::xr_event_loop(cmd_rx, msg_tx);
+        spacecal_for_monado::xr::xr_event_loop(cmd_rx, msg_tx);
     });
 
     // Give it a moment to start

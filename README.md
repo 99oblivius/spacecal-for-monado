@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="data/dev.oblivius.monado-spacecal.svg" width="128" height="128" alt="Monado SpaceCal">
+  <img src="data/dev.oblivius.spacecal-for-monado.svg" width="128" height="128" alt="SpaceCal for Monado">
 </p>
 
-<h1 align="center">Monado SpaceCal</h1>
+<h1 align="center">SpaceCal for Monado</h1>
 
 <p align="center">
   VR Tracking Space Calibrator for Monado/WiVRn
@@ -30,8 +30,8 @@ GTK4/Libadwaita application that aligns SLAM-tracked (WiVRn/inside-out) and ligh
 ### Arch Linux
 
 ```bash
-git clone https://github.com/99oblivius/monado-spacecal.git
-cd monado-spacecal
+git clone https://github.com/99oblivius/spacecal-for-monado.git
+cd spacecal-for-monado
 makepkg -si -p PKGBUILD-git
 ```
 
@@ -40,8 +40,8 @@ makepkg -si -p PKGBUILD-git
 ```bash
 sudo dnf install cargo rust gtk4-devel libadwaita-devel openxr-devel monado-devel
 
-git clone https://github.com/99oblivius/monado-spacecal.git
-cd monado-spacecal
+git clone https://github.com/99oblivius/spacecal-for-monado.git
+cd spacecal-for-monado
 cargo build --release --locked
 sudo make PREFIX=/usr install
 ```
@@ -49,3 +49,7 @@ sudo make PREFIX=/usr install
 ## License
 
 MIT
+
+## Disclaimer
+
+Monado is a trademark of its respective owners. SpaceCal for Monado is an independent open-source project and is not affiliated with or endorsed by the Monado project.

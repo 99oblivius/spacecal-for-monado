@@ -11,7 +11,7 @@ use libadwaita as adw;
 
 fn main() {
     let app = adw::Application::builder()
-        .application_id("dev.oblivius.monado-spacecal")
+        .application_id("dev.oblivius.spacecal-for-monado")
         .build();
 
     app.connect_activate(ui::build_ui);

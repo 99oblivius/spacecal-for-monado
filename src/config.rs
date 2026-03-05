@@ -15,7 +15,7 @@ impl Config {
     pub fn path() -> std::path::PathBuf {
         dirs::data_dir()
             .unwrap_or_else(|| std::path::PathBuf::from("."))
-            .join("monado-spacecal")
+            .join("spacecal-for-monado")
             .join("config.json")
     }
 
@@ -27,7 +27,7 @@ impl Config {
     /// # Examples
     ///
     /// ```
-    /// use monado_spacecal::config::Config;
+    /// use spacecal_for_monado::config::Config;
     /// let config = Config::load();
     /// ```
     pub fn load() -> Self {
@@ -66,8 +66,8 @@ impl Config {
     /// # Examples
     ///
     /// ```no_run
-    /// use monado_spacecal::config::Config;
-    /// # fn example() -> Result<(), monado_spacecal::error::ConfigError> {
+    /// use spacecal_for_monado::config::Config;
+    /// # fn example() -> Result<(), spacecal_for_monado::error::ConfigError> {
     /// let config = Config::default();
     /// config.save()?;
     /// # Ok(())

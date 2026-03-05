@@ -1,19 +1,19 @@
 [package]
-name = "monado-spacecal"
+name = "spacecal-for-monado"
 version = "0.1.0"
 edition = "2024"
-description = "Monado VR tracking space calibrator for WiVRn"
-repository = "https://github.com/99oblivius/monado-spacecal"
+description = "VR tracking space calibrator for Monado"
+repository = "https://github.com/99oblivius/spacecal-for-monado"
 license = "MIT"
 keywords = ["vr", "monado", "wivrn", "calibration", "tracking"]
 categories = ["gui"]
 
 [lib]
-name = "monado_spacecal"
+name = "spacecal_for_monado"
 path = "src/lib.rs"
 
 [[bin]]
-name = "monado-spacecal"
+name = "spacecal-for-monado"
 path = "src/main.rs"
 
 [dependencies]

@@ -78,7 +78,7 @@ impl Preset {
     pub fn presets_dir() -> PathBuf {
         dirs::config_dir()
             .unwrap_or_else(|| PathBuf::from("."))
-            .join("monado-spacecal")
+            .join("spacecal-for-monado")
             .join("presets")
     }
 

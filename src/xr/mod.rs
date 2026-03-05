@@ -143,7 +143,7 @@ impl XrSession {
         // 5. Create instance
         let instance = entry.create_instance(
             &xr::ApplicationInfo {
-                application_name: "monado-spacecal",
+                application_name: "spacecal-for-monado",
                 application_version: 1,
                 engine_name: "none",
                 engine_version: 0,

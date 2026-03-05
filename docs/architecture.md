@@ -57,7 +57,7 @@ Defined in `src/calibration/mod.rs`.
 
 `SharedState` (a type alias for `Rc<RefCell<AppState>>`) lives entirely on the GTK main thread. It is the single source of truth for connection status, device lists, source/target selection, movement intensities, and battery info.
 
-`AppState` contains a `Vec<StateListener>` (boxed `Fn(&AppState)` callbacks). Any mutation that should update the UI calls `notify_listeners()`, which iterates and fires every registered callback. Widgets register callbacks by pushing directly into `state.borrow_mut().listeners`. Selection changes are also persisted to `~/.local/share/monado-spacecal/` via `Config::save()`.
+`AppState` contains a `Vec<StateListener>` (boxed `Fn(&AppState)` callbacks). Any mutation that should update the UI calls `notify_listeners()`, which iterates and fires every registered callback. Widgets register callbacks by pushing directly into `state.borrow_mut().listeners`. Selection changes are also persisted to `~/.local/share/spacecal-for-monado/` via `Config::save()`.
 
 Because `SharedState` uses `Rc` (not `Arc`) it is intentionally not `Send`. All access must happen on the GTK main thread.
 
@@ -122,6 +122,6 @@ Command processing:
 | `src/calibration/transform.rs` | `TransformD` — double-precision transform math |
 | `src/calibration/floor.rs` | `FloorCalibrator` — median Y filtering |
 | `src/calibration/continuous.rs` | `ContinuousCalibrator` — sliding window (stub) |
-| `src/config.rs` | JSON config persistence (`~/.local/share/monado-spacecal/`) |
+| `src/config.rs` | JSON config persistence (`~/.local/share/spacecal-for-monado/`) |
 | `src/preset.rs` | TOML preset system |
 | `src/error.rs` | Error types (`thiserror`) |

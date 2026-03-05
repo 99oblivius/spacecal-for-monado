@@ -1,4 +1,4 @@
-// Library modules for monado-spacecal
+// Library modules for spacecal-for-monado
 // This allows testing of internal modules
 
 pub mod calibration;

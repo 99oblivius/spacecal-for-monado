@@ -15,7 +15,7 @@
 //!
 //! ```no_run
 //! use openxr as xr;
-//! use monado_spacecal::xr::mndx::Mndx;
+//! use spacecal_for_monado::xr::mndx::Mndx;
 //! # fn example<G>(instance: &xr::Instance, session: &xr::Session<G>) -> Result<(), Box<dyn std::error::Error>> {
 //! let mndx = Mndx::new(instance)?;
 //! let list = mndx.create_list(session)?;
@@ -72,7 +72,7 @@ impl Mndx {
     ///
     /// ```no_run
     /// # use openxr as xr;
-    /// # use monado_spacecal::xr::mndx::Mndx;
+    /// # use spacecal_for_monado::xr::mndx::Mndx;
     /// # fn example(instance: &xr::Instance) -> Result<(), Box<dyn std::error::Error>> {
     /// let mndx = Mndx::new(instance)?;
     /// # Ok(())
@@ -333,7 +333,7 @@ impl XDev {
     ///
     /// ```no_run
     /// # use openxr as xr;
-    /// # use monado_spacecal::xr::mndx::XDev;
+    /// # use spacecal_for_monado::xr::mndx::XDev;
     /// # fn example<G>(device: &XDev, session: xr::Session<G>) -> Result<(), Box<dyn std::error::Error>> {
     /// if device.can_create_space() {
     ///     let space = device.create_space(session)?;
