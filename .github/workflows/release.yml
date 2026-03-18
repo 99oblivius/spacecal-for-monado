@@ -3,7 +3,7 @@ name: Release & AUR Publish
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 permissions:
   contents: write
@@ -48,17 +48,12 @@ jobs:
           cargo install cargo-generate-rpm
           cargo generate-rpm
 
-      - name: Create source tarball
-        run: |
-          VERSION=${{ steps.version.outputs.version }}
-          git archive --format=tar.gz \
-            --prefix=spacecal-for-monado-${VERSION}/ \
-            -o spacecal-for-monado-${VERSION}.tar.gz HEAD
-
-      - name: Compute checksum
+      - name: Compute checksum from GitHub tarball
         id: checksum
         run: |
           VERSION=${{ steps.version.outputs.version }}
+          curl -sL "https://github.com/99oblivius/spacecal-for-monado/archive/refs/tags/v${VERSION}.tar.gz" \
+            -o spacecal-for-monado-${VERSION}.tar.gz
           SHA=$(sha256sum spacecal-for-monado-${VERSION}.tar.gz | cut -d' ' -f1)
           echo "sha256=${SHA}" >> "$GITHUB_OUTPUT"
           echo "${SHA}  spacecal-for-monado-${VERSION}.tar.gz" > SHA256SUMS
@@ -84,15 +79,15 @@ jobs:
           VERSION: ${{ needs.build-and-release.outputs.version }}
           SHA256: ${{ needs.build-and-release.outputs.sha256 }}
         run: |
-          sed "s/pkgver=.*/pkgver=${VERSION}/; s/sha256sums=.*/sha256sums=('${SHA256}')/" \
-            PKGBUILD > /tmp/PKGBUILD
+          sed -i "s/pkgver=.*/pkgver=${VERSION}/; s/sha256sums=.*/sha256sums=('${SHA256}')/" \
+            PKGBUILD
 
       - name: Publish to AUR
         uses: KSXGitHub/github-actions-deploy-aur@v3.0.1
         with:
           pkgname: spacecal-for-monado
-          pkgbuild: /tmp/PKGBUILD
+          pkgbuild: PKGBUILD
           commit_username: 99oblivius
-          commit_email: 99oblivius@proton.me
+          commit_email: projects@oblivius.dev
           ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
           commit_message: "Update to ${{ needs.build-and-release.outputs.version }}"
