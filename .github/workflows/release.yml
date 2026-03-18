@@ -20,7 +20,7 @@ jobs:
         run: |
           dnf install -y \
             git gcc pkg-config \
-            gtk4-devel libadwaita-devel openxr-devel monado-devel \
+            gtk4-devel libadwaita-devel openxr-devel \
             cargo rust
 
       - uses: actions/checkout@v4
