@@ -52,6 +52,12 @@ Download the `.rpm` from the [latest release](https://github.com/99oblivius/spac
 sudo dnf install spacecal-for-monado-*.rpm
 ```
 
+### NixOS
+
+```bash
+nix run github:99oblivius/spacecal-for-monado
+```
+
 ### From source
 
 ```bash
