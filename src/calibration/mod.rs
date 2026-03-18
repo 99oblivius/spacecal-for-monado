@@ -1,3 +1,4 @@
+pub mod continuous;
 pub mod floor;
 pub mod sampled;
 pub mod transform;
@@ -13,7 +14,9 @@ pub enum CalibrationCommand {
         target_origin_index: u32,
         sample_count: u32,
         stage_offset: Option<([f64; 3], [f64; 4])>,
+        continuous: bool,
     },
+    StopContinuous,
     CalibrateFloor {
         target_serial: String,
     },
@@ -41,6 +44,12 @@ pub enum CalibrationMessage {
     RecenterComplete {
         position: [f32; 3],
         orientation: [f32; 4],
+    },
+    ContinuousStarted,
+    ContinuousStopped,
+    ContinuousCorrection {
+        target_origin_index: u32,
+        delta: TransformD,
     },
     MovementUpdate { movements: Vec<DeviceMovement> },
     Error(String),

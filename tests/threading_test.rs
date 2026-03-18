@@ -49,6 +49,7 @@ fn test_xr_event_loop_commands_without_openxr() {
         target_origin_index: 0,
         sample_count: 10,
         stage_offset: None,
+        continuous: false,
     }).unwrap();
 
     // Wait for response (with timeout)
@@ -61,7 +62,7 @@ fn test_xr_event_loop_commands_without_openxr() {
             assert!(
                 msg.contains("OpenXR not available")
                     || msg.contains("not yet implemented")
-                    || msg.contains("Connect to WiVRn")
+                    || msg.contains("Connect to")
                     || msg.contains("not available")
                     || msg.contains("not found"),
                 "Error message should indicate unavailable or not implemented, got: {}",
@@ -114,7 +115,7 @@ fn test_xr_event_loop_floor_calibration() {
             assert!(
                 msg.contains("OpenXR not available")
                     || msg.contains("not yet implemented")
-                    || msg.contains("Connect to WiVRn")
+                    || msg.contains("Connect to")
                     || msg.contains("not available")
                     || msg.contains("not supported")
                     || msg.contains("not found")

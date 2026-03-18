@@ -79,6 +79,7 @@ pub struct AppState {
     known_battery_devices: HashMap<String, BatteryInfo>,
     hide_calibration_help: bool,
     sample_count: u32,
+    continuous_enabled: bool,
     listeners: Vec<StateListener>,
 }
 
@@ -101,6 +102,7 @@ impl AppState {
             known_battery_devices: HashMap::new(),
             hide_calibration_help: config.hide_calibration_help,
             sample_count: config.sample_count,
+            continuous_enabled: config.continuous_enabled,
             listeners: Vec::new(),
         };
         state.update_known_battery_devices();
@@ -318,12 +320,24 @@ impl AppState {
         }
     }
 
+    pub fn continuous_enabled(&self) -> bool {
+        self.continuous_enabled
+    }
+
+    pub fn set_continuous_enabled(&mut self, enabled: bool) {
+        if self.continuous_enabled != enabled {
+            self.continuous_enabled = enabled;
+            self.save_config();
+        }
+    }
+
     fn save_config(&self) {
         let config = Config {
             source: self.source_id.clone().unwrap_or_default(),
             target: self.target_id.clone().unwrap_or_default(),
             hide_calibration_help: self.hide_calibration_help,
             sample_count: self.sample_count,
+            continuous_enabled: self.continuous_enabled,
         };
         if let Err(e) = config.save() {
             eprintln!("Warning: Failed to save config: {}", e);

@@ -6,6 +6,7 @@ use std::ptr;
 use std::time::{Duration, Instant};
 use crate::calibration::{CalibrationCommand, CalibrationMessage, CalibrationResult, DeviceMovement, TransformD};
 use crate::calibration::sampled::{SampleCollector, PoseSample};
+use crate::calibration::continuous::{ContinuousTracker, compute_rigid_offset};
 use crate::calibration::floor::FloorCalibrator;
 use crate::error::XrError;
 
@@ -175,6 +176,105 @@ impl XrSession {
     pub fn now(&self) -> xr::Time {
         self.instance.now().unwrap_or(xr::Time::from_nanos(1))
     }
+}
+
+// --- Continuous tracking ---
+
+fn transform_from_posef(pose: xr::Posef) -> TransformD {
+    TransformD::from_xr_pose(
+        [pose.position.x, pose.position.y, pose.position.z],
+        [pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w],
+    )
+}
+
+fn linear_speed(velocity: &xr::SpaceVelocity) -> f32 {
+    if velocity.velocity_flags.contains(xr::SpaceVelocityFlags::LINEAR_VALID) {
+        let v = velocity.linear_velocity;
+        (v.x * v.x + v.y * v.y + v.z * v.z).sqrt()
+    } else {
+        0.0
+    }
+}
+
+fn apply_stage_offset(
+    transform: TransformD,
+    stage_offset: &Option<([f64; 3], [f64; 4])>,
+) -> TransformD {
+    match stage_offset {
+        Some((pos, ori)) => {
+            let stage = TransformD::from_xr_pose(
+                [pos[0] as f32, pos[1] as f32, pos[2] as f32],
+                [ori[0] as f32, ori[1] as f32, ori[2] as f32, ori[3] as f32],
+            );
+            stage.mul(&transform)
+        }
+        None => transform,
+    }
+}
+
+fn run_continuous_loop<S: MessageSender>(
+    cmd_rx: &mpsc::Receiver<CalibrationCommand>,
+    msg_tx: &S,
+    xr_session: &XrSession,
+    source_space: &xr::Space,
+    target_space: &xr::Space,
+    reference_space: &xr::Space,
+    stage_offset: &Option<([f64; 3], [f64; 4])>,
+    target_origin_index: u32,
+    mut calibrator: ContinuousTracker,
+) {
+    let _ = msg_tx.send(CalibrationMessage::ContinuousStarted);
+
+    // Allow UI to apply the initial calibration first
+    std::thread::sleep(Duration::from_millis(100));
+
+    let interval = Duration::from_millis(40);
+    let mut next_tick = Instant::now();
+
+    loop {
+        match cmd_rx.try_recv() {
+            Ok(CalibrationCommand::StopContinuous)
+            | Ok(CalibrationCommand::Shutdown)
+            | Err(mpsc::TryRecvError::Disconnected) => break,
+            Ok(CalibrationCommand::StartSampled { .. }) => break,
+            _ => {}
+        }
+
+        let time = xr_session.now();
+        let source_relate = source_space.relate(reference_space, time);
+        let target_relate = target_space.relate(reference_space, time);
+
+        if let (Ok((src_loc, src_vel)), Ok((tgt_loc, tgt_vel))) = (source_relate, target_relate) {
+            let both_tracked = src_loc.location_flags.contains(
+                xr::SpaceLocationFlags::POSITION_TRACKED | xr::SpaceLocationFlags::ORIENTATION_TRACKED
+            ) && tgt_loc.location_flags.contains(
+                xr::SpaceLocationFlags::POSITION_TRACKED | xr::SpaceLocationFlags::ORIENTATION_TRACKED
+            );
+
+            if both_tracked {
+                let src_transform = apply_stage_offset(transform_from_posef(src_loc.pose), stage_offset);
+                let tgt_transform = apply_stage_offset(transform_from_posef(tgt_loc.pose), stage_offset);
+
+                if let Some(delta) = calibrator.tick(
+                    src_transform, tgt_transform,
+                    linear_speed(&src_vel), linear_speed(&tgt_vel),
+                ) {
+                    let _ = msg_tx.send(CalibrationMessage::ContinuousCorrection {
+                        target_origin_index,
+                        delta,
+                    });
+                }
+            }
+        }
+
+        next_tick += interval;
+        let now = Instant::now();
+        if next_tick > now {
+            std::thread::sleep(next_tick - now);
+        }
+    }
+
+    let _ = msg_tx.send(CalibrationMessage::ContinuousStopped);
 }
 
 // Movement detection constants
@@ -356,7 +456,7 @@ pub fn xr_event_loop<S: MessageSender>(
                 // Send empty update to clear highlights
                 let _ = msg_tx.send(CalibrationMessage::MovementUpdate { movements: vec![] });
             }
-            Ok(CalibrationCommand::StartSampled { source_serial, target_serial, target_origin_index, sample_count, stage_offset }) => {
+            Ok(CalibrationCommand::StartSampled { source_serial, target_serial, target_origin_index, sample_count, stage_offset, continuous }) => {
 
                 // Check if XR is available
                 if xr_session.is_none() {
@@ -600,13 +700,24 @@ pub fn xr_event_loop<S: MessageSender>(
                                 // This offset satisfies: O × T = S
                                 // Apply O to target tracking origin to align it with source.
                                 let result = CalibrationResult {
-                                    transform: offset,
+                                    transform: offset.clone(),
                                     target_origin_index,
                                     median_error_degrees,
                                     axis_diversity,
                                 };
 
                                 let _ = msg_tx.send(CalibrationMessage::SampledComplete(result));
+
+                                if continuous {
+                                    if let Some(rigid_offset) = compute_rigid_offset(collector.samples(), &offset) {
+                                        let calibrator = ContinuousTracker::new(rigid_offset);
+                                        run_continuous_loop(
+                                            &cmd_rx, &msg_tx, xr_session,
+                                            &source_space, &target_space, &reference_space,
+                                            &stage_offset, target_origin_index, calibrator,
+                                        );
+                                    }
+                                }
                             }
                             Err(e) => {
                                 let user_msg = match &e {
@@ -868,6 +979,9 @@ pub fn xr_event_loop<S: MessageSender>(
                         orientation,
                     });
                 }
+            }
+            Ok(CalibrationCommand::StopContinuous) => {
+                // Handled inside run_continuous_loop; ignore if not tracking
             }
         }
     }

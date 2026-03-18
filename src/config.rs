@@ -9,6 +9,8 @@ pub struct Config {
     pub hide_calibration_help: bool,
     #[serde(default = "default_sample_count")]
     pub sample_count: u32,
+    #[serde(default)]
+    pub continuous_enabled: bool,
 }
 
 fn default_sample_count() -> u32 {

@@ -361,20 +361,55 @@ pub fn build_ui(app: &adw::Application) {
         sample_list.append(&row);
     }
 
+    // Continuous toggle row (below sample counts, separated)
+    let separator = gtk4::Separator::new(Orientation::Horizontal);
+    separator.set_margin_top(4);
+    separator.set_margin_bottom(4);
+    sample_list.append(&separator);
+
+    let continuous_row = gtk4::ListBoxRow::new();
+    let continuous_hbox = GtkBox::new(Orientation::Horizontal, 8);
+    continuous_hbox.set_margin_start(12);
+    continuous_hbox.set_margin_end(12);
+    continuous_hbox.set_margin_top(8);
+    continuous_hbox.set_margin_bottom(8);
+
+    let continuous_check = Label::new(
+        if state.borrow().continuous_enabled() { Some("\u{2713}") } else { None }
+    );
+    continuous_check.set_width_request(16);
+
+    let continuous_label = Label::new(Some("Continuous"));
+    continuous_label.set_xalign(0.0);
+    continuous_label.set_hexpand(true);
+
+    continuous_hbox.append(&continuous_check);
+    continuous_hbox.append(&continuous_label);
+    continuous_row.set_child(Some(&continuous_hbox));
+    sample_list.append(&continuous_row);
+    let continuous_row_index = continuous_row.index();
+
+    let is_tracking = Rc::new(Cell::new(false));
+
     let sample_count_for_list = Rc::clone(&sample_count);
     let sample_popover_for_list = sample_popover.clone();
     let check_labels_for_list = Rc::clone(&check_labels);
-    let state_for_sample = Rc::clone(&state);
+    let state_for_list = Rc::clone(&state);
     sample_list.connect_row_activated(move |_, row| {
+        let index = row.index();
         let counts = [200u32, 400, 600];
-        let index = row.index() as usize;
-        if let Some(&count) = counts.get(index) {
+        if let Some(&count) = counts.get(index as usize) {
             sample_count_for_list.set(count);
-            state_for_sample.borrow_mut().set_sample_count(count);
+            state_for_list.borrow_mut().set_sample_count(count);
             let labels = check_labels_for_list.borrow();
             for (i, label) in labels.iter().enumerate() {
-                label.set_text(if i == index { "\u{2713}" } else { "" });
+                label.set_text(if i == index as usize { "\u{2713}" } else { "" });
             }
+        } else if index == continuous_row_index {
+            let mut s = state_for_list.borrow_mut();
+            let new_val = !s.continuous_enabled();
+            s.set_continuous_enabled(new_val);
+            continuous_check.set_text(if new_val { "\u{2713}" } else { "" });
         }
         sample_popover_for_list.popdown();
     });
@@ -707,7 +742,13 @@ pub fn build_ui(app: &adw::Application) {
     let cmd_tx_calibrate = Rc::clone(&cmd_tx);
     let window_for_calibrate = window.clone();
     let sample_count_for_calibrate = Rc::clone(&sample_count);
+    let is_tracking_for_calibrate = Rc::clone(&is_tracking);
     calibrate_btn.connect_clicked(move |btn| {
+        if is_tracking_for_calibrate.get() {
+            let _ = cmd_tx_calibrate.send(CalibrationCommand::StopContinuous);
+            return;
+        }
+
         let s = state_for_calibrate.borrow();
         let (Some(src), Some(tgt)) = (s.selected_source(), s.selected_target()) else {
             toasts_for_calibrate.show("Select both source and target devices");
@@ -717,6 +758,7 @@ pub fn build_ui(app: &adw::Application) {
         // Get stage offset from Monado (like motoc does) to transform poses to common frame
         let stage_offset = s.connection().and_then(|conn| conn.get_stage_offset().ok());
         let hide_help = s.hide_calibration_help();
+        let continuous = s.continuous_enabled();
         drop(s);
 
         let cmd = CalibrationCommand::StartSampled {
@@ -725,6 +767,7 @@ pub fn build_ui(app: &adw::Application) {
             target_origin_index: tgt.category_index,
             sample_count: sample_count_for_calibrate.get(),
             stage_offset,
+            continuous,
         };
 
         if hide_help {
@@ -931,11 +974,15 @@ pub fn build_ui(app: &adw::Application) {
     let toasts_for_msg = toasts.clone();
     let state_for_msg = Rc::clone(&state);
     let source_list_for_msg = Rc::clone(&source_list);
+    let is_tracking_for_msg = Rc::clone(&is_tracking);
     let target_list_for_msg = Rc::clone(&target_list);
     let background_box_for_msg = background_box.clone();
     let countdown_label_for_msg = countdown_label.clone();
     let progress_fill_for_msg = progress_fill.clone();
     let window_for_msg = window.clone();
+
+    let continuous_baseline: Rc<RefCell<Option<crate::calibration::TransformD>>> = Rc::new(RefCell::new(None));
+    let baseline_for_msg = Rc::clone(&continuous_baseline);
 
     glib::source::idle_add_local(move || {
         while let Ok(msg) = msg_rx.try_recv() {
@@ -991,10 +1038,9 @@ pub fn build_ui(app: &adw::Application) {
                         let position = result.transform.position_f64();
                         let orientation = result.transform.orientation_f64();
                         match conn.apply_offset(result.target_origin_index, position, orientation) {
-                            Ok(_) => {
-                                // Confidence = 100 × exp(-0.028 × d^1.6)
-                                // Tuned for typical grip drift of 1-15°:
-                                //   ~1° → 97%,  ~5° → 72%,  ~10° → 34%,  ~15° → 12%
+                            Ok(full_offset) => {
+                                *baseline_for_msg.borrow_mut() = Some(full_offset);
+
                                 let d = result.median_error_degrees as f64;
                                 let confidence = (100.0 * (-0.028 * d.powf(1.6)).exp()) as u32;
                                 toasts_for_msg
@@ -1132,7 +1178,27 @@ pub fn build_ui(app: &adw::Application) {
                         &target_list_for_msg,
                     );
                 }
+                CalibrationMessage::ContinuousStarted => {
+                    is_tracking_for_msg.set(true);
+                    calibrate_btn_for_msg.set_label("Tracking");
+                    calibrate_btn_for_msg.set_sensitive(true);
+                }
+                CalibrationMessage::ContinuousStopped => {
+                    is_tracking_for_msg.set(false);
+                    calibrate_btn_for_msg.set_label("Calibrate");
+                    calibrate_btn_for_msg.set_sensitive(true);
+                }
+                CalibrationMessage::ContinuousCorrection { target_origin_index, delta } => {
+                    if let Some(ref mut origin) = *baseline_for_msg.borrow_mut() {
+                        crate::calibration::continuous::apply_correction(origin, &delta);
+                        let s = state_for_msg.borrow();
+                        if let Some(conn) = s.connection() {
+                            let _ = conn.set_offset_absolute(target_origin_index, origin);
+                        }
+                    }
+                }
                 CalibrationMessage::Error(e) => {
+                    is_tracking_for_msg.set(false);
                     calibrate_btn_for_msg.set_label("Calibrate");
                     calibrate_btn_for_msg.set_sensitive(true);
                     floor_btn_for_msg.set_label("Floor");

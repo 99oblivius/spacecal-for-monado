@@ -100,6 +100,7 @@ impl SampleCollector {
         self.samples.push(sample);
     }
 
+    pub fn samples(&self) -> &[PoseSample] { &self.samples }
     pub fn sample_count(&self) -> u32 { self.samples.len() as u32 }
     pub fn is_complete(&self) -> bool { self.samples.len() >= self.target_count as usize }
     pub fn progress(&self) -> (u32, u32) { (self.sample_count(), self.target_count) }

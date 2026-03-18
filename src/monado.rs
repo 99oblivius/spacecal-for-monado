@@ -104,8 +104,9 @@ impl MonadoConnection {
             .map_err(|e| MonadoError::ApplyOffsetFailed(format!("{:?}", e)))
     }
 
-    /// Compose a new calibration offset with the existing one (like motoc).
-    pub fn apply_offset(&self, origin_index: u32, position: [f64; 3], orientation: [f64; 4]) -> Result<(), MonadoError> {
+    /// Compose a new calibration offset with the existing one.
+    /// Returns the full composed offset (for use as a baseline in continuous mode).
+    pub fn apply_offset(&self, origin_index: u32, position: [f64; 3], orientation: [f64; 4]) -> Result<crate::calibration::TransformD, MonadoError> {
         use crate::calibration::TransformD;
         use nalgebra::{UnitQuaternion, Quaternion, Vector3};
 
@@ -163,6 +164,36 @@ impl MonadoConnection {
                     z: full_offset.orientation_f64()[2] as f32,
                 },
                 s: full_offset.orientation_f64()[3] as f32,
+            },
+        };
+
+        origin.set_offset(pose)
+            .map_err(|e| MonadoError::ApplyOffsetFailed(format!("{:?}", e)))?;
+
+        Ok(full_offset)
+    }
+
+    pub fn set_offset_absolute(&self, origin_index: u32, offset: &crate::calibration::TransformD) -> Result<(), MonadoError> {
+        let origins = self.monado.tracking_origins()
+            .map_err(|e| MonadoError::TrackingOriginFailed(format!("{:?}", e)))?;
+
+        let origin = origins.into_iter()
+            .find(|o| o.id == origin_index)
+            .ok_or(MonadoError::InvalidDeviceId(origin_index))?;
+
+        let pose = Pose {
+            position: mint::Vector3 {
+                x: offset.origin.x as f32,
+                y: offset.origin.y as f32,
+                z: offset.origin.z as f32,
+            },
+            orientation: mint::Quaternion {
+                v: mint::Vector3 {
+                    x: offset.orientation_f64()[0] as f32,
+                    y: offset.orientation_f64()[1] as f32,
+                    z: offset.orientation_f64()[2] as f32,
+                },
+                s: offset.orientation_f64()[3] as f32,
             },
         };
 
