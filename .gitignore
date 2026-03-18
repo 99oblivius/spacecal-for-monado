@@ -1,6 +1,9 @@
 /target
+result
 /pkg
 
 *.tar.gz
 *.tar.zst
 *.pkg.tar.*
+
+.direnv/
