@@ -1,14 +1,12 @@
-//! Main application window
-//!
-//! Uses centralized state management for clean, predictable UI updates.
+//! Main application window.
 
 use std::rc::Rc;
 use std::sync::mpsc;
 use std::thread;
 
+use gtk4::glib;
 use gtk4::prelude::*;
 use gtk4::{Align, Box as GtkBox, Button, CssProvider, Label, Orientation, Overlay};
-use gtk4::glib;
 use libadwaita as adw;
 use libadwaita::prelude::*;
 
@@ -19,7 +17,7 @@ use crate::ui::device_list::DeviceList;
 use crate::ui::state::{SharedState, create_shared_state};
 use crate::xr::xr_event_loop;
 
-/// Wrapper for toast overlay that dismisses previous toast before showing new one
+/// Dismisses previous toast before showing a new one.
 #[derive(Clone)]
 struct ToastManager {
     overlay: adw::ToastOverlay,
@@ -34,7 +32,6 @@ impl ToastManager {
         }
     }
 
-    /// Show a toast, dismissing any existing one first
     fn show(&self, message: &str) {
         // Dismiss previous toast if any
         if let Some(prev) = self.current_toast.borrow_mut().take() {
@@ -46,8 +43,6 @@ impl ToastManager {
         self.overlay.add_toast(toast);
     }
 
-    /// Show a calibration result toast with color based on confidence and longer timeout.
-    /// `axis_diversity` is 0.0-1.0 from the Kabsch SVD (σ_min/σ_max).
     fn show_calibration_result(&self, confidence: u32, axis_diversity: f32) {
         if let Some(prev) = self.current_toast.borrow_mut().take() {
             prev.dismiss();
@@ -89,7 +84,6 @@ impl ToastManager {
     }
 }
 
-/// Play a sound using canberra-gtk-play (fire-and-forget, silent if unavailable)
 fn play_sound(sound_id: &str) {
     let _ = std::process::Command::new("canberra-gtk-play")
         .arg("-i")
@@ -100,12 +94,7 @@ fn play_sound(sound_id: &str) {
         .spawn();
 }
 
-/// Reset all calibration visual feedback to idle state
-fn restore_idle_visuals(
-    background_box: &GtkBox,
-    countdown_label: &Label,
-    progress_fill: &GtkBox,
-) {
+fn restore_idle_visuals(background_box: &GtkBox, countdown_label: &Label, progress_fill: &GtkBox) {
     background_box.remove_css_class("calibration-bg-active");
     countdown_label.set_visible(false);
     progress_fill.set_visible(false);
@@ -113,21 +102,13 @@ fn restore_idle_visuals(
     progress_fill.set_size_request(0, -1);
 }
 
-/// Update progress fill width based on fraction complete
 fn update_progress_fill(fill: &GtkBox, window: &adw::ApplicationWindow, fraction: f64) {
     let fill_width = (window.width() as f64 * fraction) as i32;
     fill.set_size_request(fill_width, -1);
 }
 
-/// SVG showing the optimal figure-eight motion pattern for calibration.
-/// The Kabsch algorithm needs diverse rotation axes — a figure-eight with tilting
-/// provides yaw + pitch from the sweeping motion and roll from leaning into curves.
-/// Edit the SVG at assets/calibration_motion.svg (viewable in any browser/Inkscape).
 const CALIBRATION_MOTION_SVG: &str = include_str!("../../assets/calibration_motion.svg");
 
-/// Build the calibration help dialog with motion diagram and "don't show again" toggle.
-/// When `calibrate_action` is true, shows Cancel/Calibrate buttons (pre-calibration flow).
-/// When false, shows a single "Got it" button (help/info flow).
 fn build_help_dialog(state: &SharedState, calibrate_action: bool) -> adw::AlertDialog {
     let dialog = adw::AlertDialog::builder()
         .heading("Calibration Instructions")
@@ -249,11 +230,11 @@ pub fn build_ui(app: &adw::Application) {
     let window = adw::ApplicationWindow::builder()
         .application(app)
         .title("SpaceCal for Monado")
-        .default_width(940)
+        .default_width(800)
         .default_height(630)
         .build();
 
-    window.set_size_request(940, 630);
+    window.set_size_request(800, 630);
 
     let toolbar_view = adw::ToolbarView::new();
 
@@ -311,12 +292,16 @@ pub fn build_ui(app: &adw::Application) {
 
     let source_list = DeviceList::new("Source");
     source_list.widget().set_width_request(250);
-    source_list.widget().set_tooltip_text(Some("Reference device with correct tracking"));
+    source_list
+        .widget()
+        .set_tooltip_text(Some("Reference device with correct tracking"));
     top_row.append(source_list.widget());
 
     let target_list = DeviceList::new("Target");
     target_list.widget().set_width_request(250);
-    target_list.widget().set_tooltip_text(Some("Device to calibrate (its origin is adjusted)"));
+    target_list
+        .widget()
+        .set_tooltip_text(Some("Device to calibrate (its origin is adjusted)"));
     top_row.append(target_list.widget());
 
     // Button row
@@ -332,7 +317,9 @@ pub fn build_ui(app: &adw::Application) {
     calibrate_btn.set_label("Calibrate");
     calibrate_btn.add_css_class("suggested-action");
     calibrate_btn.set_width_request(110);
-    calibrate_btn.set_tooltip_text(Some("Align target tracking to source (dropdown: sample count)"));
+    calibrate_btn.set_tooltip_text(Some(
+        "Align target tracking to source (dropdown: sample count)",
+    ));
 
     // Sample count dropdown (200, 400, 600)
     let sample_count = Rc::new(Cell::new(state.borrow().sample_count()));
@@ -356,7 +343,11 @@ pub fn build_ui(app: &adw::Application) {
         hbox.set_margin_bottom(8);
 
         let current = sample_count.get();
-        let check = Label::new(if count == current { Some("\u{2713}") } else { None });
+        let check = Label::new(if count == current {
+            Some("\u{2713}")
+        } else {
+            None
+        });
         check.set_width_request(16);
         check_labels.borrow_mut().push(check.clone());
 
@@ -450,7 +441,7 @@ pub fn build_ui(app: &adw::Application) {
             status_label.set_text("Connected");
             status_label.remove_css_class("warning");
         } else {
-            status_label.set_text("Waiting for WiVRn...");
+            status_label.set_text("Waiting for Monado...");
             if !status_label.has_css_class("warning") {
                 status_label.add_css_class("warning");
             }
@@ -468,7 +459,6 @@ pub fn build_ui(app: &adw::Application) {
         update_battery_bar(battery_bar, &s);
     }
 
-    /// Update the battery status bar with current device battery levels
     fn update_battery_bar(bar: &GtkBox, state: &crate::ui::state::AppState) {
         // Clear existing children
         while let Some(child) = bar.first_child() {
@@ -499,14 +489,24 @@ pub fn build_ui(app: &adw::Application) {
             } else if let Some(charge) = info.charge {
                 let pct = (charge * 100.0).round() as u32;
                 let icon_name = if info.charging {
-                    if pct > 75 { "battery-full-charging-symbolic" }
-                    else if pct > 40 { "battery-good-charging-symbolic" }
-                    else if pct > 15 { "battery-low-charging-symbolic" }
-                    else { "battery-caution-charging-symbolic" }
-                } else if pct > 75 { "battery-full-symbolic" }
-                else if pct > 40 { "battery-good-symbolic" }
-                else if pct > 15 { "battery-low-symbolic" }
-                else { "battery-caution-symbolic" };
+                    if pct > 75 {
+                        "battery-full-charging-symbolic"
+                    } else if pct > 40 {
+                        "battery-good-charging-symbolic"
+                    } else if pct > 15 {
+                        "battery-low-charging-symbolic"
+                    } else {
+                        "battery-caution-charging-symbolic"
+                    }
+                } else if pct > 75 {
+                    "battery-full-symbolic"
+                } else if pct > 40 {
+                    "battery-good-symbolic"
+                } else if pct > 15 {
+                    "battery-low-symbolic"
+                } else {
+                    "battery-caution-symbolic"
+                };
 
                 let top = GtkBox::new(Orientation::Horizontal, 4);
                 top.set_halign(Align::Center);
@@ -555,39 +555,32 @@ pub fn build_ui(app: &adw::Application) {
     }
 
     // Initial UI sync
-    update_ui_from_state(&state, &source_list, &target_list, &status_label, &battery_bar);
+    update_ui_from_state(
+        &state,
+        &source_list,
+        &target_list,
+        &status_label,
+        &battery_bar,
+    );
 
     // Source selection changed
     let state_for_source = Rc::clone(&state);
-    let source_list_for_source = Rc::clone(&source_list);
     let target_list_for_source = Rc::clone(&target_list);
-    let status_for_source = status_label.clone();
     source_list.connect_changed(move |device| {
         let unique_id = device.map(|d| d.unique_id().to_string());
         state_for_source.borrow_mut().set_source(unique_id);
-        // Re-sync target dropdown (its available devices may have changed)
         let s = state_for_source.borrow();
-        let target_devices = s.target_devices();
-        target_list_for_source.set_devices(target_devices, s.target_name());
-        drop(s);
-        // Don't need full update_ui_from_state, just the target dropdown
-        let _ = (&source_list_for_source, &status_for_source); // silence warnings
+        target_list_for_source.set_devices(s.target_devices(), s.target_name());
     });
 
     // Target selection changed
     let state_for_target = Rc::clone(&state);
     let source_list_for_target = Rc::clone(&source_list);
-    let target_list_for_target = Rc::clone(&target_list);
-    let status_for_target = status_label.clone();
     target_list.connect_changed(move |device| {
         let unique_id = device.map(|d| d.unique_id().to_string());
         state_for_target.borrow_mut().set_target(unique_id);
-        // Re-sync source dropdown (its available devices may have changed)
         let s = state_for_target.borrow();
-        let source_devices = s.source_devices();
-        source_list_for_target.set_devices(source_devices, s.source_name());
-        drop(s);
-        let _ = (&target_list_for_target, &status_for_target); // silence warnings
+        source_list_for_target.set_devices(s.source_devices(), s.source_name());
     });
 
     // Refresh button
@@ -626,29 +619,38 @@ pub fn build_ui(app: &adw::Application) {
         let is_connected = state.borrow().is_connected();
         let interval_ms = if is_connected { 5000 } else { 500 };
 
-        glib::timeout_add_local_once(
-            std::time::Duration::from_millis(interval_ms),
-            move || {
-                if state.borrow().is_connected() {
-                    // Already connected — just refresh batteries (cheap, reuses connection)
-                    state.borrow_mut().refresh_batteries();
-                    update_battery_bar(&battery_bar, &state.borrow());
+        glib::timeout_add_local_once(std::time::Duration::from_millis(interval_ms), move || {
+            if state.borrow().is_connected() {
+                // Already connected — just refresh batteries (cheap, reuses connection)
+                state.borrow_mut().refresh_batteries();
+                update_battery_bar(&battery_bar, &state.borrow());
 
-                    // If connection was lost during battery refresh, update full UI
-                    if !state.borrow().is_connected() {
-                        update_ui_from_state(&state, &source_list, &target_list, &status_label, &battery_bar);
-                    }
-                } else {
-                    // Not connected — try to connect
-                    let changed = state.borrow_mut().refresh_connection();
-                    if changed {
-                        update_ui_from_state(&state, &source_list, &target_list, &status_label, &battery_bar);
-                    }
+                // If connection was lost during battery refresh, update full UI
+                if !state.borrow().is_connected() {
+                    update_ui_from_state(
+                        &state,
+                        &source_list,
+                        &target_list,
+                        &status_label,
+                        &battery_bar,
+                    );
                 }
+            } else {
+                // Not connected — try to connect
+                let changed = state.borrow_mut().refresh_connection();
+                if changed {
+                    update_ui_from_state(
+                        &state,
+                        &source_list,
+                        &target_list,
+                        &status_label,
+                        &battery_bar,
+                    );
+                }
+            }
 
-                schedule_poll(state, source_list, target_list, status_label, battery_bar);
-            },
-        );
+            schedule_poll(state, source_list, target_list, status_label, battery_bar);
+        });
     }
 
     schedule_poll(
@@ -700,7 +702,6 @@ pub fn build_ui(app: &adw::Application) {
         }
     });
 
-    // Calibrate button — shows help dialog on first use
     let toasts_for_calibrate = toasts.clone();
     let state_for_calibrate = Rc::clone(&state);
     let cmd_tx_calibrate = Rc::clone(&cmd_tx);
@@ -708,16 +709,10 @@ pub fn build_ui(app: &adw::Application) {
     let sample_count_for_calibrate = Rc::clone(&sample_count);
     calibrate_btn.connect_clicked(move |btn| {
         let s = state_for_calibrate.borrow();
-        let src = s.selected_source();
-        let tgt = s.selected_target();
-
-        if src.is_none() || tgt.is_none() {
+        let (Some(src), Some(tgt)) = (s.selected_source(), s.selected_target()) else {
             toasts_for_calibrate.show("Select both source and target devices");
             return;
-        }
-
-        let src = src.unwrap();
-        let tgt = tgt.unwrap();
+        };
 
         // Get stage offset from Monado (like motoc does) to transform poses to common frame
         let stage_offset = s.connection().and_then(|conn| conn.get_stage_offset().ok());
@@ -769,7 +764,8 @@ pub fn build_ui(app: &adw::Application) {
             match s.selected_target() {
                 Some(dev) => dev.unique_id().to_string(),
                 None => {
-                    toasts_for_floor.show("Select a target device first, then place it on the floor");
+                    toasts_for_floor
+                        .show("Select a target device first, then place it on the floor");
                     return;
                 }
             }
@@ -909,28 +905,13 @@ pub fn build_ui(app: &adw::Application) {
         reset_popover_for_list.popdown();
     });
 
-    // Recenter button - uses source device orientation to set forward direction
     let toasts_for_recenter = toasts.clone();
-    let state_for_recenter = Rc::clone(&state);
     let cmd_tx_recenter = Rc::clone(&cmd_tx);
     recenter_btn.connect_clicked(move |btn| {
-        // Get source device (HMD) for orientation reference
-        let source_serial = {
-            let s = state_for_recenter.borrow();
-            match s.selected_source() {
-                Some(dev) => dev.unique_id().to_string(),
-                None => {
-                    toasts_for_recenter.show("Select a source device first");
-                    return;
-                }
-            }
-        };
-
-        if let Err(e) = cmd_tx_recenter.send(CalibrationCommand::Recenter { source_serial }) {
+        if let Err(e) = cmd_tx_recenter.send(CalibrationCommand::Recenter) {
             toasts_for_recenter.show(&format!("Failed to start recenter: {}", e));
             return;
         }
-
         btn.set_label("Recentering...");
         btn.set_sensitive(false);
     });
@@ -1011,13 +992,17 @@ pub fn build_ui(app: &adw::Application) {
                         let orientation = result.transform.orientation_f64();
                         match conn.apply_offset(result.target_origin_index, position, orientation) {
                             Ok(_) => {
-                                // Exponential quality curve: realistic drift is 1-15°,
-                                // so 100 × exp(-0.028 × d^1.6) gives a natural gradient
+                                // Confidence = 100 × exp(-0.028 × d^1.6)
+                                // Tuned for typical grip drift of 1-15°:
+                                //   ~1° → 97%,  ~5° → 72%,  ~10° → 34%,  ~15° → 12%
                                 let d = result.median_error_degrees as f64;
                                 let confidence = (100.0 * (-0.028 * d.powf(1.6)).exp()) as u32;
-                                toasts_for_msg.show_calibration_result(confidence, result.axis_diversity);
+                                toasts_for_msg
+                                    .show_calibration_result(confidence, result.axis_diversity);
                             }
-                            Err(e) => toasts_for_msg.show(&format!("Failed to apply calibration: {}", e)),
+                            Err(e) => {
+                                toasts_for_msg.show(&format!("Failed to apply calibration: {}", e))
+                            }
                         }
                     } else {
                         toasts_for_msg.show("Cannot apply calibration: not connected");
@@ -1040,11 +1025,8 @@ pub fn build_ui(app: &adw::Application) {
 
                     let apply_result = {
                         let s = state_for_msg.borrow();
-                        if let Some(conn) = s.connection() {
-                            Some(conn.set_floor_absolute(measured_floor))
-                        } else {
-                            None
-                        }
+                        s.connection()
+                            .map(|conn| conn.set_floor_absolute(measured_floor))
                     };
 
                     match apply_result {
@@ -1053,14 +1035,20 @@ pub fn build_ui(app: &adw::Application) {
                             let direction = if measured_floor >= 0.0 { "up" } else { "down" };
                             toasts_for_msg.show(&format!(
                                 "Floor set {:.1}cm {}",
-                                delta_cm.abs(), direction
+                                delta_cm.abs(),
+                                direction
                             ));
                         }
-                        Some(Err(e)) => toasts_for_msg.show(&format!("Failed to apply floor: {}", e)),
+                        Some(Err(e)) => {
+                            toasts_for_msg.show(&format!("Failed to apply floor: {}", e))
+                        }
                         None => toasts_for_msg.show("Cannot apply floor: not connected"),
                     }
                 }
-                CalibrationMessage::RecenterComplete { position, orientation } => {
+                CalibrationMessage::RecenterComplete {
+                    position,
+                    orientation,
+                } => {
                     recenter_btn_for_msg.set_label("Recenter");
                     recenter_btn_for_msg.set_sensitive(true);
                     restore_idle_visuals(
@@ -1113,28 +1101,31 @@ pub fn build_ui(app: &adw::Application) {
                                 };
 
                                 // Build message from non-empty parts
-                                let parts: Vec<&str> = [x_str.as_str(), z_str.as_str(), yaw_str.as_str()]
-                                    .into_iter()
-                                    .filter(|s| !s.is_empty())
-                                    .collect();
+                                let parts: Vec<&str> =
+                                    [x_str.as_str(), z_str.as_str(), yaw_str.as_str()]
+                                        .into_iter()
+                                        .filter(|s| !s.is_empty())
+                                        .collect();
 
                                 if parts.is_empty() {
                                     toasts_for_msg.show("Centered");
                                 } else {
-                                    toasts_for_msg.show(&format!("Centered ({})", parts.join(", ")));
+                                    toasts_for_msg
+                                        .show(&format!("Centered ({})", parts.join(", ")));
                                 }
                             }
-                            Err(e) => toasts_for_msg.show(&format!("Failed to apply recenter: {}", e)),
+                            Err(e) => {
+                                toasts_for_msg.show(&format!("Failed to apply recenter: {}", e))
+                            }
                         }
                     } else {
                         toasts_for_msg.show("Cannot apply recenter: not connected");
                     }
                 }
-                CalibrationMessage::ResetFloorComplete => {
-                    toasts_for_msg.show("Floor reset");
-                }
                 CalibrationMessage::MovementUpdate { movements } => {
-                    state_for_msg.borrow_mut().set_movement_intensities(movements);
+                    state_for_msg
+                        .borrow_mut()
+                        .set_movement_intensities(movements);
                     update_movement_only(
                         &state_for_msg,
                         &source_list_for_msg,
@@ -1153,9 +1144,9 @@ pub fn build_ui(app: &adw::Application) {
                         &countdown_label_for_msg,
                         &progress_fill_for_msg,
                     );
+                    play_sound("complete");
                     toasts_for_msg.show(&format!("Error: {}", e));
                 }
-                _ => {}
             }
         }
         glib::ControlFlow::Continue

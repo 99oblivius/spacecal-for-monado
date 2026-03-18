@@ -1,4 +1,3 @@
-pub mod hand_tracking;
 pub mod mndx;
 
 use openxr as xr;
@@ -10,19 +9,16 @@ use crate::calibration::sampled::{SampleCollector, PoseSample};
 use crate::calibration::floor::FloorCalibrator;
 use crate::error::XrError;
 
-/// A trait for sending calibration messages back to the UI thread
 pub trait MessageSender: Send {
     fn send(&self, msg: CalibrationMessage) -> Result<(), String>;
 }
 
-/// Implementation for std::sync::mpsc::Sender
 impl MessageSender for mpsc::Sender<CalibrationMessage> {
     fn send(&self, msg: CalibrationMessage) -> Result<(), String> {
         mpsc::Sender::send(self, msg).map_err(|e| e.to_string())
     }
 }
 
-/// Implementation for async_channel::Sender
 impl MessageSender for async_channel::Sender<CalibrationMessage> {
     fn send(&self, msg: CalibrationMessage) -> Result<(), String> {
         self.send_blocking(msg).map_err(|e| e.to_string())
@@ -96,19 +92,13 @@ impl xr::Graphics for Headless {
     }
 }
 
-/// Manages the OpenXR session and device spaces
 pub struct XrSession {
-    #[allow(dead_code)]
     instance: xr::Instance,
-    #[allow(dead_code)]
     session: xr::Session<xr::AnyGraphics>,
     mndx: Option<Mndx>,
-    // hand tracking will be added later
 }
 
 impl XrSession {
-    /// Create a new headless OpenXR session
-    #[allow(dead_code)]
     pub fn new() -> Result<Self, XrError> {
         // 1. Load OpenXR runtime
         let entry = unsafe { xr::Entry::load() }
@@ -131,9 +121,6 @@ impl XrSession {
         let has_mndx = available.other.iter().any(|e| e == "XR_MNDX_xdev_space");
         if has_mndx {
             exts.other.push("XR_MNDX_xdev_space".to_string());
-        }
-        if available.ext_hand_tracking {
-            exts.ext_hand_tracking = true;
         }
         // Enable time conversion for getting current time
         if available.khr_convert_timespec_time {
@@ -185,20 +172,6 @@ impl XrSession {
         })
     }
 
-    /// Check if MNDX_xdev_space is available
-    #[allow(dead_code)]
-    pub fn has_mndx(&self) -> bool {
-        self.mndx.is_some()
-    }
-
-    /// Check if hand tracking is available
-    #[allow(dead_code)]
-    pub fn has_hand_tracking(&self) -> bool {
-        // Will be implemented with hand_tracking module
-        false
-    }
-
-    /// Get current time from the OpenXR runtime
     pub fn now(&self) -> xr::Time {
         self.instance.now().unwrap_or(xr::Time::from_nanos(1))
     }
@@ -214,23 +187,11 @@ struct DeviceMovementState {
     last_moving_time: Option<Instant>,
 }
 
-/// Run the OpenXR event loop in a background thread.
-///
-/// This function is the main entry point for the calibration background thread. It:
-/// 1. Attempts to create an OpenXR headless session
-/// 2. If OpenXR is unavailable, continues in fallback mode (sends errors for XR operations)
-/// 3. Processes CalibrationCommand messages from the channel
-/// 4. Sends CalibrationMessage results back to the main thread
-/// 5. Exits cleanly when receiving a Shutdown command or when the channel closes
 pub fn xr_event_loop<S: MessageSender>(
     cmd_rx: mpsc::Receiver<CalibrationCommand>,
     msg_tx: S,
 ) {
-    // Try to create XR session (mutable for reconnection)
-    // Use catch_unwind to handle panics from unimplemented code gracefully
-    let mut xr_session = std::panic::catch_unwind(XrSession::new)
-        .ok()
-        .and_then(|result| result.ok());
+    let mut xr_session = XrSession::new().ok();
 
     // Movement detection state
     let mut movement_detection_active = false;
@@ -254,9 +215,7 @@ pub fn xr_event_loop<S: MessageSender>(
         if (xr_session.is_none() || consecutive_failures >= 5) && last_reconnect_attempt.elapsed() >= Duration::from_secs(2) {
             last_reconnect_attempt = Instant::now();
             consecutive_failures = 0;
-            xr_session = std::panic::catch_unwind(XrSession::new)
-                .ok()
-                .and_then(|result| result.ok());
+            xr_session = XrSession::new().ok();
         }
 
         // Handle movement detection polling using OpenXR velocity (like motoc)
@@ -402,7 +361,7 @@ pub fn xr_event_loop<S: MessageSender>(
                 // Check if XR is available
                 if xr_session.is_none() {
                     let _ = msg_tx.send(CalibrationMessage::Error(
-                        "Connect to WiVRn to enable calibration".to_string()
+                        "Connect to Monado to enable calibration".to_string()
                     ));
                     continue;
                 }
@@ -541,7 +500,6 @@ pub fn xr_event_loop<S: MessageSender>(
                         // Get current time from the OpenXR runtime
                         let time = xr_session.now();
 
-                        // Locate source space relative to reference space
                         let source_location = match source_space.locate(&reference_space, time) {
                             Ok(loc) => loc,
                             Err(e) => {
@@ -552,7 +510,6 @@ pub fn xr_event_loop<S: MessageSender>(
                             }
                         };
 
-                        // Locate target space relative to reference space
                         let target_location = match target_space.locate(&reference_space, time) {
                             Ok(loc) => loc,
                             Err(e) => {
@@ -563,7 +520,6 @@ pub fn xr_event_loop<S: MessageSender>(
                             }
                         };
 
-                        // Check if poses are valid (tracked)
                         let source_valid = source_location.location_flags.contains(
                             xr::SpaceLocationFlags::POSITION_VALID | xr::SpaceLocationFlags::ORIENTATION_VALID
                         );
@@ -572,7 +528,6 @@ pub fn xr_event_loop<S: MessageSender>(
                         );
 
                         if !source_valid || !target_valid {
-                            // Pose not valid, skip this sample
                             next_sample_time += sample_interval;
                             let now = Instant::now();
                             if next_sample_time > now {
@@ -581,7 +536,6 @@ pub fn xr_event_loop<S: MessageSender>(
                             continue;
                         }
 
-                        // Extract poses
                         let source_pose = source_location.pose;
                         let target_pose = target_location.pose;
 
@@ -608,7 +562,6 @@ pub fn xr_event_loop<S: MessageSender>(
                             target_transform = stage.mul(&target_transform);
                         }
 
-                        // Convert to PoseSample
                         let sample = PoseSample::from_xr_poses(
                             source_transform.position_f32(),
                             source_transform.orientation_f32(),
@@ -648,11 +601,7 @@ pub fn xr_event_loop<S: MessageSender>(
                                 // Apply O to target tracking origin to align it with source.
                                 let result = CalibrationResult {
                                     transform: offset,
-                                    // Use device names for display, serials were used for lookup
-                                    source_name: source_dev.name().to_string(),
-                                    target_name: target_dev.name().to_string(),
                                     target_origin_index,
-                                    sample_count: collector.sample_count(),
                                     median_error_degrees,
                                     axis_diversity,
                                 };
@@ -677,26 +626,10 @@ pub fn xr_event_loop<S: MessageSender>(
                     }
                 }
             }
-            Ok(CalibrationCommand::StartContinuous { source_name: _, target_name: _ }) => {
-                if xr_session.is_none() {
-                    let _ = msg_tx.send(CalibrationMessage::Error(
-                        "Connect to WiVRn to enable calibration".to_string()
-                    ));
-                    continue;
-                }
-
-                // TODO: Implement continuous calibration
-                let _ = msg_tx.send(CalibrationMessage::Error(
-                    "Continuous calibration not yet implemented".to_string()
-                ));
-            }
-            Ok(CalibrationCommand::StopContinuous) => {
-                // TODO: Implement stopping continuous calibration
-            }
             Ok(CalibrationCommand::CalibrateFloor { target_serial }) => {
                 if xr_session.is_none() {
                     let _ = msg_tx.send(CalibrationMessage::Error(
-                        "Connect to WiVRn to enable floor calibration".to_string()
+                        "Connect to Monado to enable floor calibration".to_string()
                     ));
                     continue;
                 }
@@ -849,20 +782,10 @@ pub fn xr_event_loop<S: MessageSender>(
                     }
                 }
             }
-            Ok(CalibrationCommand::ResetFloor) => {
-                // Reset floor is handled directly via libmonado in UI thread
-                let _ = msg_tx.send(CalibrationMessage::ResetFloorComplete);
-            }
-            Ok(CalibrationCommand::ResetOffset { category_index: _ }) => {
-                // Reset offset is handled directly via libmonado in UI thread
-                let _ = msg_tx.send(CalibrationMessage::Error(
-                    "Reset offset should be called from UI thread".to_string()
-                ));
-            }
-            Ok(CalibrationCommand::Recenter { source_serial: _ }) => {
+            Ok(CalibrationCommand::Recenter) => {
                 if xr_session.is_none() {
                     let _ = msg_tx.send(CalibrationMessage::Error(
-                        "Connect to WiVRn to enable recenter".to_string()
+                        "Connect to Monado to enable recenter".to_string()
                     ));
                     continue;
                 }
