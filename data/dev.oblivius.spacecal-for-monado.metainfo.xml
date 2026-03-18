@@ -4,7 +4,7 @@
   <name>SpaceCal for Monado</name>
   <summary>VR Tracking Space Calibrator for Monado/WiVRn</summary>
   <metadata_license>CC0-1.0</metadata_license>
-  <project_license>MIT</project_license>
+  <project_license>GPL-3.0-only</project_license>
   <description>
     <p>
       A GTK4 desktop application for calibrating VR tracking spaces on Linux.
@@ -13,7 +13,7 @@
     <p>Features:</p>
     <ul>
       <li>Select source and target tracking devices from categorized dropdowns</li>
-      <li>SVD/Kabsch sampled calibration with 3-second countdown</li>
+      <li>Sampled calibration with 3-second countdown</li>
       <li>Floor calibration using target device Y position</li>
       <li>Recenter forward direction and reset tracking origins</li>
       <li>Battery status display for all tracked devices</li>
@@ -29,7 +29,7 @@
   </developer>
   <content_rating type="oars-1.1" />
   <releases>
-    <release version="0.1.0" date="2025-01-26">
+    <release version="1.0.0" date="2026-03-18">
       <description>
         <p>Initial release</p>
       </description>

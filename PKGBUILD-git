@@ -1,11 +1,11 @@
 # Maintainer: 99oblivius <99oblivius at proton dot me>
 pkgname=spacecal-for-monado-git
-pkgver=r6.90ac108
+pkgver=r10.5cf90d9
 pkgrel=1
 pkgdesc="VR Tracking Space Calibrator for Monado/WiVRn (git version)"
 arch=('x86_64' 'aarch64')
 url="https://github.com/99oblivius/spacecal-for-monado"
-license=('MIT')
+license=('GPL-3.0-only')
 depends=('gtk4' 'libadwaita' 'openxr' 'monado')
 makedepends=('cargo' 'git')
 optdepends=('libcanberra: audio feedback during calibration')
@@ -36,7 +36,7 @@ check() {
     cd "${pkgname%-git}"
     export RUSTUP_TOOLCHAIN=stable
     export CARGO_TARGET_DIR=target
-    cargo test --frozen
+    cargo test --lib --frozen
 }
 
 package() {

@@ -4,6 +4,7 @@ DATADIR = $(PREFIX)/share
 APPLICATIONSDIR = $(DATADIR)/applications
 ICONSDIR = $(DATADIR)/icons/hicolor/scalable/apps
 METAINFODIR = $(DATADIR)/metainfo
+LICENSEDIR = $(DATADIR)/licenses
 
 APP_ID = dev.oblivius.spacecal-for-monado
 BIN_NAME = spacecal-for-monado
@@ -15,11 +16,13 @@ all: build
 build:
 	cargo build --release --locked
 
-install: build
+install:
 	install -Dm755 target/release/$(BIN_NAME) $(DESTDIR)$(BINDIR)/$(BIN_NAME)
 	install -Dm644 data/$(APP_ID).desktop $(DESTDIR)$(APPLICATIONSDIR)/$(APP_ID).desktop
 	install -Dm644 data/$(APP_ID).svg $(DESTDIR)$(ICONSDIR)/$(APP_ID).svg
 	install -Dm644 data/$(APP_ID).metainfo.xml $(DESTDIR)$(METAINFODIR)/$(APP_ID).metainfo.xml
+	install -Dm644 LICENSE $(DESTDIR)$(LICENSEDIR)/$(BIN_NAME)/LICENSE
+	install -Dm644 NOTICE $(DESTDIR)$(LICENSEDIR)/$(BIN_NAME)/NOTICE
 
 install-user: build
 	install -Dm755 target/release/$(BIN_NAME) $(HOME)/.local/bin/$(BIN_NAME)
