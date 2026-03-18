@@ -1,6 +1,8 @@
 /target
 /pkg
+/result
 
 *.tar.gz
 *.tar.zst
 *.pkg.tar.*
+flake.lock
