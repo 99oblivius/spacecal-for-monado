@@ -73,6 +73,13 @@
               "rustc"
               "rustfmt"
             ])
+
+            # SCFM specific dependencies
+            openxr-loader
+            libadwaita
+            gtk4
+            pkg-config
+            monado
           ];
         };
       }
