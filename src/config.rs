@@ -16,10 +16,7 @@ fn default_sample_count() -> u32 {
 }
 
 impl Config {
-    /// Get the path to the configuration file
-    ///
-    /// Returns the path to the config.json file in the user's data directory.
-    /// Falls back to the current directory if the data directory cannot be determined.
+    /// Config file path. Falls back to current dir if data dir unavailable.
     pub fn path() -> std::path::PathBuf {
         dirs::data_dir()
             .unwrap_or_else(|| std::path::PathBuf::from("."))
@@ -27,11 +24,6 @@ impl Config {
             .join("config.json")
     }
 
-    /// Load configuration from disk
-    ///
-    /// Attempts to load the configuration file from the default path.
-    /// If the file does not exist or cannot be read/parsed, returns a default configuration.
-    ///
     /// # Examples
     ///
     /// ```
@@ -59,18 +51,6 @@ impl Config {
         }
     }
 
-    /// Save configuration to disk
-    ///
-    /// Writes the configuration to the default path as a JSON file.
-    /// Creates the parent directory if it does not exist.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if:
-    /// - The config directory cannot be created
-    /// - The configuration cannot be serialized to JSON
-    /// - The file cannot be written
-    ///
     /// # Examples
     ///
     /// ```no_run

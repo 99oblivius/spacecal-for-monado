@@ -2,7 +2,6 @@ mod calibration;
 mod config;
 mod error;
 mod monado;
-mod preset;
 mod ui;
 mod xr;
 

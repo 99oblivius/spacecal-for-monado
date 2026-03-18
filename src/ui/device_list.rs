@@ -1,8 +1,4 @@
-//! Custom device selector with popover and live movement highlighting
-//!
-//! Shows a button displaying current selection. Clicking opens a popover
-//! overlay with all devices. Moving devices have highlighted backgrounds
-//! that update in real-time while popover is open. Click outside to close.
+//! Device selector with popover and live movement highlighting.
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -20,13 +16,11 @@ use crate::ui::device_selector::Device;
 type SelectionCallback = Box<dyn Fn(Option<Device>)>;
 type PopoverCallback = Box<dyn Fn(bool)>; // true = opened, false = closed
 
-/// Row with its CSS provider for smooth intensity updates
 struct HighlightableRow {
     row: ListBoxRow,
     css_provider: CssProvider,
 }
 
-/// A device selector with clickable button and popover overlay
 pub struct DeviceList {
     container: GtkBox,
     button: Button,
@@ -34,22 +28,15 @@ pub struct DeviceList {
     popover: Popover,
     scrolled: ScrolledWindow,
     list_box: ListBox,
-    /// Current list of devices
     devices: RefCell<Vec<Device>>,
-    /// Currently selected device unique ID (serial or name fallback)
     selected_id: RefCell<Option<String>>,
-    /// Movement intensities (device unique_id -> intensity 0.0-1.0)
     movement_intensities: RefCell<HashMap<String, f32>>,
-    /// Map from device unique_id to row + css provider for live updates
     device_rows: RefCell<HashMap<String, HighlightableRow>>,
-    /// Callback for selection changes
     on_changed: RefCell<Option<SelectionCallback>>,
-    /// Callback for popover visibility changes
     on_popover_visibility: RefCell<Option<PopoverCallback>>,
 }
 
 impl DeviceList {
-    /// Create a new device selector with a label
     pub fn new(label_text: &str) -> Rc<Self> {
         let container = GtkBox::new(Orientation::Vertical, 8);
 
@@ -147,12 +134,10 @@ impl DeviceList {
         this
     }
 
-    /// Get the widget for adding to a container
     pub fn widget(&self) -> &GtkBox {
         &self.container
     }
 
-    /// Rebuild the list content (called when popover opens)
     fn rebuild_list(self: &Rc<Self>) {
         // Clear existing rows
         while let Some(row) = self.list_box.first_child() {
@@ -201,7 +186,6 @@ impl DeviceList {
         }
     }
 
-    /// Handle row activation (selection)
     fn handle_row_activation(self: &Rc<Self>, row: &ListBoxRow) {
         let index = row.index();
 
@@ -244,7 +228,6 @@ impl DeviceList {
         self.popover.popdown();
     }
 
-    /// Create a row with background highlighting
     fn create_device_row(&self, device: Option<&Device>, is_selected: bool, intensity: f32) -> HighlightableRow {
         static ROW_COUNTER: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
         let row_id = ROW_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -295,7 +278,6 @@ impl DeviceList {
         HighlightableRow { row, css_provider }
     }
 
-    /// Apply exact intensity value as background color (true lerp, no discrete steps)
     fn apply_intensity(css_provider: &CssProvider, css_class: &str, intensity: f32) {
         // Green highlight: rgba(74, 222, 128, alpha) where alpha lerps with intensity
         // Max alpha 0.5 at intensity 1.0, min alpha 0.0 at intensity 0.0
@@ -307,8 +289,6 @@ impl DeviceList {
         css_provider.load_from_string(&css);
     }
 
-    /// Update the displayed devices
-    /// `selected_id` is the unique device ID (serial or name fallback)
     pub fn set_devices(&self, devices: Vec<Device>, selected_id: Option<&str>) {
         *self.devices.borrow_mut() = devices.clone();
         *self.selected_id.borrow_mut() = selected_id.map(String::from);
@@ -329,7 +309,6 @@ impl DeviceList {
         }
     }
 
-    /// Update movement intensities (only affects popover rows when visible)
     pub fn update_movement(&self, intensities: &HashMap<String, f32>) {
         // Update stored intensities
         *self.movement_intensities.borrow_mut() = intensities.clone();
@@ -350,12 +329,10 @@ impl DeviceList {
         }
     }
 
-    /// Connect a callback for selection changes
     pub fn connect_changed<F: Fn(Option<Device>) + 'static>(self: &Rc<Self>, callback: F) {
         *self.on_changed.borrow_mut() = Some(Box::new(callback));
     }
 
-    /// Connect a callback for popover visibility changes (true = opened, false = closed)
     pub fn connect_popover_visibility<F: Fn(bool) + 'static>(self: &Rc<Self>, callback: F) {
         *self.on_popover_visibility.borrow_mut() = Some(Box::new(callback));
     }
