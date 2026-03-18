@@ -1,16 +1,6 @@
 /target
+/pkg
 
-# makepkg artifacts
 *.tar.gz
 *.tar.zst
 *.pkg.tar.*
-/pkg/
-
-# Claude / tool state
-.claude/
-.omc/
-
-# Duplicate source trees
-/src/spacecal-for-monado/
-/src/spacecal-for-monado-*/
-/spacecal-for-monado/

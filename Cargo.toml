@@ -1,10 +1,10 @@
 [package]
 name = "spacecal-for-monado"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2024"
 description = "VR tracking space calibrator for Monado"
 repository = "https://github.com/99oblivius/spacecal-for-monado"
-license = "MIT"
+license = "GPL-3.0-only"
 keywords = ["vr", "monado", "wivrn", "calibration", "tracking"]
 categories = ["gui"]
 
@@ -21,16 +21,41 @@ dirs = "6.0.0"
 gtk4 = { version = "0.10.3", features = ["v4_12"] }
 libadwaita = { version = "0.8.1", features = ["v1_5"] }
 async-channel = "2"
-regex = "1.12.2"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
 libmonado = "1.3.2"
 openxr = { version = "0.19", features = ["linked"] }
 nalgebra = "0.34"
 mint = "0.5.9"
-toml = "0.8"
-chrono = { version = "0.4", features = ["serde"] }
 thiserror = "2"
+
+[package.metadata.deb]
+section = "utils"
+depends = "libgtk-4-1 (>= 4.12), libadwaita-1-0 (>= 1.5), libopenxr-loader1, monado-service"
+assets = [
+    ["target/release/spacecal-for-monado", "usr/bin/", "755"],
+    ["data/dev.oblivius.spacecal-for-monado.desktop", "usr/share/applications/", "644"],
+    ["data/dev.oblivius.spacecal-for-monado.svg", "usr/share/icons/hicolor/scalable/apps/", "644"],
+    ["data/dev.oblivius.spacecal-for-monado.metainfo.xml", "usr/share/metainfo/", "644"],
+    ["LICENSE", "usr/share/doc/spacecal-for-monado/", "644"],
+    ["NOTICE", "usr/share/doc/spacecal-for-monado/", "644"],
+]
+
+[package.metadata.generate-rpm]
+assets = [
+    { source = "target/release/spacecal-for-monado", dest = "/usr/bin/spacecal-for-monado", mode = "755" },
+    { source = "data/dev.oblivius.spacecal-for-monado.desktop", dest = "/usr/share/applications/dev.oblivius.spacecal-for-monado.desktop", mode = "644" },
+    { source = "data/dev.oblivius.spacecal-for-monado.svg", dest = "/usr/share/icons/hicolor/scalable/apps/dev.oblivius.spacecal-for-monado.svg", mode = "644" },
+    { source = "data/dev.oblivius.spacecal-for-monado.metainfo.xml", dest = "/usr/share/metainfo/dev.oblivius.spacecal-for-monado.metainfo.xml", mode = "644" },
+    { source = "LICENSE", dest = "/usr/share/licenses/spacecal-for-monado/LICENSE", mode = "644" },
+    { source = "NOTICE", dest = "/usr/share/licenses/spacecal-for-monado/NOTICE", mode = "644" },
+]
+
+[package.metadata.generate-rpm.requires]
+gtk4 = ">= 4.12"
+libadwaita = ">= 1.5"
+openxr = "*"
+monado = "*"
 
 [profile.release]
 lto = true

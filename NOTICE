@@ -1,0 +1,13 @@
+SpaceCal for Monado
+Copyright (C) 2026 99oblivius
+
+The calibration approach (paired pose sampling, rotation axis alignment,
+least-squares translation) was informed by:
+
+- motoc by galister (GPL-3.0) — early feasibility studies and
+  Monado tracking origin integration approach
+  https://github.com/galister/motoc
+
+- OpenVR-SpaceCalibrator by pushrax (MIT) — original calibration
+  framework concept
+  https://github.com/pushrax/OpenVR-SpaceCalibrator
