@@ -53,6 +53,12 @@
                       fi
                   fi
               '
+
+              mkdir -p $out/share/applications
+              mkdir -p $out/share/icons
+
+              cp data/dev.oblivius.spacecal-for-monado.svg $out/share/icons/
+              cp data/dev.oblivius.spacecal-for-monado.desktop $out/share/applications/
           '';
         };
 
