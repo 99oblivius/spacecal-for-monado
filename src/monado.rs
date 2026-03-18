@@ -2,13 +2,11 @@ use libmonado::{Monado, Pose, MndProperty};
 use crate::error::MonadoError;
 use crate::ui::{Device, Category};
 
-/// Wrapper around libmonado for device operations
 pub struct MonadoConnection {
     monado: Monado,
 }
 
 impl MonadoConnection {
-    /// Connect to the Monado runtime
     pub fn connect() -> Result<Self, MonadoError> {
         match Monado::auto_connect() {
             Ok(monado) => Ok(Self { monado }),
@@ -16,7 +14,6 @@ impl MonadoConnection {
         }
     }
 
-    /// Enumerate all available devices grouped by tracking origin (category)
     pub fn enumerate_devices(&self) -> Result<Vec<Category>, MonadoError> {
         // First get all tracking origins
         let origins: Vec<_> = self.monado.tracking_origins()
@@ -86,7 +83,6 @@ impl MonadoConnection {
         Ok(categories)
     }
 
-    /// Reset offset for a tracking origin to identity transform
     pub fn reset_tracking_origin(&self, origin_index: u32) -> Result<(), MonadoError> {
         let origins = self.monado.tracking_origins()
             .map_err(|e| MonadoError::TrackingOriginFailed(format!("{:?}", e)))?;
@@ -108,8 +104,7 @@ impl MonadoConnection {
             .map_err(|e| MonadoError::ApplyOffsetFailed(format!("{:?}", e)))
     }
 
-    /// Apply a calibration offset to a tracking origin
-    /// This composes the new offset with the existing one (like motoc does)
+    /// Compose a new calibration offset with the existing one (like motoc).
     pub fn apply_offset(&self, origin_index: u32, position: [f64; 3], orientation: [f64; 4]) -> Result<(), MonadoError> {
         use crate::calibration::TransformD;
         use nalgebra::{UnitQuaternion, Quaternion, Vector3};
@@ -175,8 +170,7 @@ impl MonadoConnection {
             .map_err(|e| MonadoError::ApplyOffsetFailed(format!("{:?}", e)))
     }
 
-    /// Get the Stage reference space offset from Monado
-    /// This is used to transform poses into a common world frame (like motoc does)
+    /// STAGE offset for world-frame transform (like motoc).
     pub fn get_stage_offset(&self) -> Result<([f64; 3], [f64; 4]), MonadoError> {
         let offset = self.monado.get_reference_space_offset(libmonado::ReferenceSpaceType::Stage)
             .map_err(|e| MonadoError::TrackingOriginFailed(format!("{:?}", e)))?;
@@ -196,14 +190,7 @@ impl MonadoConnection {
         Ok((position, orientation))
     }
 
-    /// Set the floor level via STAGE reference space
-    ///
-    /// The measured_floor_y is in STAGE coordinates (affected by current offset).
-    /// We convert to native coordinates before setting to ensure idempotency:
-    ///   native_floor = measured_floor + current_offset
-    ///
-    /// This way pressing floor at the same physical location always results
-    /// in the same STAGE offset, regardless of the current offset value.
+    /// Set floor level. Converts from STAGE to native coords for idempotency.
     pub fn set_floor_absolute(&self, measured_floor_y: f64) -> Result<(), MonadoError> {
         let current = self.monado.get_reference_space_offset(libmonado::ReferenceSpaceType::Stage)
             .map_err(|e| MonadoError::TrackingOriginFailed(format!("{:?}", e)))?;
@@ -225,7 +212,6 @@ impl MonadoConnection {
             .map_err(|e| MonadoError::ApplyOffsetFailed(format!("{:?}", e)))
     }
 
-    /// Reset floor level (STAGE reference space Y offset to 0)
     pub fn reset_floor(&self) -> Result<(), MonadoError> {
         let current = self.monado.get_reference_space_offset(libmonado::ReferenceSpaceType::Stage)
             .map_err(|e| MonadoError::TrackingOriginFailed(format!("{:?}", e)))?;
@@ -243,18 +229,7 @@ impl MonadoConnection {
             .map_err(|e| MonadoError::ApplyOffsetFailed(format!("{:?}", e)))
     }
 
-    /// Apply recenter using STAGE reference space offset
-    ///
-    /// hmd_position: HMD position in STAGE coords [x, y, z]
-    /// hmd_orientation: HMD orientation as quaternion [x, y, z, w]
-    ///
-    /// Recenter computes a new offset such that the HMD appears at origin
-    /// facing -Z in the new STAGE space. Floor Y is preserved.
-    ///
-    /// The offset transforms native tracking coords to STAGE coords:
-    ///   stage_pos = offset_rot * native_pos + offset_trans
-    ///
-    /// We compute the native HMD pose, then find the offset that places it at origin.
+    /// Recenter STAGE origin to current HMD position/heading, preserving floor Y.
     pub fn apply_recenter_absolute(&self, hmd_position: [f32; 3], hmd_orientation: [f32; 4]) -> Result<(), MonadoError> {
         use nalgebra::{Rotation3, UnitQuaternion, Quaternion, Vector3};
 
@@ -342,8 +317,6 @@ impl MonadoConnection {
             .map_err(|e| MonadoError::ApplyOffsetFailed(format!("{:?}", e)))
     }
 
-    /// Refresh battery status for all devices in the given categories
-    /// This is cheaper than full re-enumeration since it only queries battery
     pub fn refresh_batteries(&self, categories: &mut [Category]) -> Result<(), MonadoError> {
         let devices = self.monado.devices()
             .map_err(|e| MonadoError::EnumerationFailed(format!("{:?}", e)))?;
@@ -351,10 +324,10 @@ impl MonadoConnection {
         // Build a lookup from device index to battery status
         let mut battery_map = std::collections::HashMap::new();
         for device in devices {
-            if let Ok(status) = device.battery_status() {
-                if status.present {
-                    battery_map.insert(device.index, (status.charge, status.charging));
-                }
+            if let Ok(status) = device.battery_status()
+                && status.present
+            {
+                battery_map.insert(device.index, (status.charge, status.charging));
             }
         }
 
@@ -374,10 +347,7 @@ impl MonadoConnection {
         Ok(())
     }
 
-    /// Reset center (horizontal position and yaw) while preserving floor Y
-    ///
-    /// This undoes any recenter operation, returning the origin to its default
-    /// position (0, 0) with forward facing -Z, while keeping floor calibration.
+    /// Reset horizontal position and yaw, preserving floor Y.
     pub fn reset_center(&self) -> Result<(), MonadoError> {
         let current = self.monado.get_reference_space_offset(libmonado::ReferenceSpaceType::Stage)
             .map_err(|e| MonadoError::TrackingOriginFailed(format!("{:?}", e)))?;
@@ -400,12 +370,10 @@ impl MonadoConnection {
     }
 }
 
-/// Try to connect to Monado, or fall back to None
 pub fn try_connect() -> Option<MonadoConnection> {
     MonadoConnection::connect().ok()
 }
 
-/// Enumerate devices using libmonado, with fallback to empty list
 pub fn enumerate_devices() -> Vec<Category> {
     match try_connect() {
         Some(conn) => conn.enumerate_devices().unwrap_or_default(),
